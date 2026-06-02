@@ -1,142 +1,6 @@
 # M5Paper E-Ink Ebook Reader | M5Paper 电子书阅读器
 
-[English](#english) | [简体中文](#简体中文)
-
----
-
-<a name="english"></a>
-# English Version
-
-A basic TXT ebook reader designed for the **M5Paper v1 and v1.1** (ESP32 + E-Ink) development kit.
-
-This project provides a Chinese reading implementation on the e-paper screen, featuring custom font rendering, background pagination indexing, custom wallpaper selection, and a web-based interface for transferring books and fonts over Wi-Fi.
-
-> [!NOTE]
-> **Personal Learning Project**: This is a personal learning project that currently only supports basic e-reading features. The development of this project was highly inspired by and referenced the excellent [M5ReadPaper](https://github.com/shinemoon/M5ReadPaper) project.
-
-## Features
-
-*   **E-paper Interface**: High-contrast E-paper interface with a battery indicator, touch targets, and partial refresh support.
-*   **Chinese Text Support**:
-    *   Support for **UTF-8** and **GBK** encodings (automatic conversion).
-    *   Word wrapping and punctuation handling for Chinese characters.
-*   **Custom Font Subsystem**:
-    *   Renders custom binary font formats generated from `.ttf`.
-    *   **Dual-Font Support**: Includes two preset rendering styles (configurable via the Web UI):
-        *   *Fluency (流畅)*: Smaller file size, faster loading, slightly aliased.
-        *   *Clarity (清晰)*: Antialiased, smooth curves, larger file size.
-    *   **Font Caching**: Caches character glyphs in PSRAM to reduce page-turn latency.
-    *   **NotoSansSC Fallback**: Falls back to the built-in NotoSansSC font if the external font file is missing.
-*   **Reading Settings**:
-    *   Adjustable font sizes (ranging from 16px to 40px).
-    *   Adjustable line spacing (1.5x and 2.0x).
-*   **Pagination & Bookmarks**:
-    *   Background pagination indexing with cache saved as `.idx` files on the SD card.
-    *   Add and manage bookmarks per book.
-*   **Wi-Fi File Transfer (Web UI)**:
-    *   Runs a local Web Server on M5Paper to upload `.txt` books and `.bin` fonts directly from your phone or computer.
-    *   Select and preview font rendering styles ("Fluency" vs. "Clarity") right in the web browser before uploading.
-*   **Power & Storage Management**:
-    *   Wallpaper selection from images on the SD card.
-    *   Deep sleep integration (with optional boot-straight-to-reading feature).
-    *   Clearing reading records and cache.
-
-## Demos & Physical Screenshots
-
-*Below are placeholders for the planned physical photos showcasing the device and software. You can place corresponding images in `docs/images/` in the future to enable them:*
-
-| Bookshelf Interface | Reading Interface | Settings Page |
-| :---: | :---: | :---: |
-| ![Bookshelf UI](docs/images/bookshelf_ui.jpg) <br> *Device bookshelf screen* | ![Reading UI](docs/images/reading_ui.jpg) <br> *Device reading rendering* | ![Settings UI](docs/images/settings_ui.jpg) <br> *Device settings adjustments* |
-
-| Device Transfer Hotspot | Web Upload Client | Font Contrast Comparison |
-| :---: | :---: | :---: |
-| ![Hotspot Screen](docs/images/transfer_device_ui.jpg) <br> *Device hotspot info page* | ![Browser Client](docs/images/transfer_web_ui.jpg) <br> *Web client upload page* | ![Font Contrast](docs/images/font_comparison.jpg) <br> *Fluency vs. Clarity comparison* |
-
-## Operations
-
-The reader is operated via the touchscreen and the physical wheel button.
-
-### Reading Page
-*   **Page Turn (Touch)**: Tap the left 1/3 area of the screen to go to the previous page, and tap the right 1/3 area to go to the next page.
-*   **Page Turn (Wheel)**: Scroll the physical wheel button up/down to flip pages.
-*   **Clear Screen Ghosting**: Press down on the physical wheel button.
-*   **Open Reading Menu**: Tap the center 1/3 area of the screen.
-
-### Reading Menu
-*   **Return (返回)**: Tap the button in the top-left corner to return to the Bookshelf.
-*   **Jump (跳转)**: Tap the button in the bottom-left corner to input a page number or percentage for precise jumping.
-*   **Close Menu**: Tap any blank area in the middle of the screen to close the menu.
-
-### Sleep & Wake
-*   **Low-Power Sleep**: Tap the **Sleep (休眠)** button in the bottom-right corner of the reading menu to enter deep sleep immediately.
-*   **Wake Up Device**: Press and hold the physical wheel button inward for **3 seconds** to wake up.
-
-### Bookshelf Page
-*   **Book Selection**: Tap a book card to start reading. The most recently read book is automatically pinned to the top of the shelf.
-*   **Wi-Fi Transfer**: Tap **Transfer (传书)** in the bottom navigation bar to start a local hotspot, then connect via phone/computer and visit the displayed IP address to upload books/fonts.
-*   **Settings Page**: Tap **Settings (设置)** in the bottom navigation bar:
-    *   *Line Spacing*: Switch between 1.5x and 2.0x (automatically re-paginates).
-    *   *Clear Obsolete Progress*: One-click clearing of configurations (.cfg) and pagination indexes (.idx) for manually deleted books to free space.
-
-
-## Getting Started
-
-### 1. Prerequisites
-*   Install **PlatformIO Core (CLI)**. You can install it via pip:
-    ```bash
-    pip install -U platformio
-    ```
-    *(For alternative installation methods, refer to [PlatformIO CLI Installation Guide](https://docs.platformio.org/en/latest/core/installation/index.html))*
-*   An **SD Card** formatted to FAT32 inserted into the M5Paper.
-
-### 2. Build and Flash
-1.  Clone or download this repository, and navigate to the project root:
-    ```bash
-    git clone <repository_url>
-    cd m5paper-ebook
-    ```
-2.  Connect your M5Paper to your computer via a USB-C cable.
-3.  Compile the project:
-    ```bash
-    pio run
-    ```
-4.  Upload the firmware to the device:
-    ```bash
-    pio run -t upload
-    ```
-5.  *(Optional)* Open the serial monitor to view logs:
-    ```bash
-    pio device monitor
-    ```
-
-## Usage & File Management
-
-### SD Card Directory Structure
-To ensure proper operation, insert a FAT32-formatted SD card. 
-*   **Auto-generated**: The system automatically creates `/configs` on the first boot, and **automatically creates `/books`, `/fonts`, and `/images`** when you enter the "WiFi Transfer" page or upload files.
-*   **Manual Copying**: If you are copying files offline via an SD card reader, you should manually prepare the following structure:
-
-```text
-SD Card/
-├── books/                  # Place your .txt ebooks here (create manually if copying via PC card reader)
-├── configs/                # Auto-generated global config, index files, and bookmarks
-├── fonts/                  # Place your custom binary font (.bin) files here
-└── images/                 # Place your lock screen wallpaper image files here
-```
-
-### Wi-Fi Book & Font Transfer
-1.  From the Bookshelf page, tap **"传书" (Transfer)** in the bottom navigation bar.
-2.  The M5Paper will start a local Wi-Fi hotspot. Connect your phone or computer to the Wi-Fi network displayed on the screen.
-3.  Open your web browser and navigate to the URL shown on the M5Paper display (e.g., `http://192.168.4.1`).
-4.  Use the web interface to upload your TXT books or custom binary font files.
-
-### Converting Custom Fonts
-You can convert TrueType fonts (`.ttf`) into the custom binary format compatible with this reader:
-```bash
-python tools/ttf2bin.py input_font.ttf output_font.bin
-```
-Once converted, you can **directly copy the `.bin` font file to the `/fonts` directory on your SD card**, or upload it via the Wi-Fi Transfer web interface, then select it in the Settings page.
+[简体中文](#简体中文) | [English](#english)
 
 ---
 
@@ -148,7 +12,7 @@ Once converted, you can **directly copy the `.bin` font file to the `/fonts` dir
 本项目在墨水屏上实现了中文阅读功能，包含自定义字体渲染、后台分页索引、休眠壁纸选择，以及用于在局域网内传输书籍和字体的 Web 界面。
 
 > [!NOTE]
-> **个人学习项目**：本项目仅为一个个人学习项目，目前仅支持一些基础的电子书阅读功能。在开发过程中，参考并借鉴了优秀的开源项目 [M5ReadPaper](https://github.com/shinemoon/M5ReadPaper)。
+> 本项目仅用于个人学习与探索。在开发过程中，使用了 AI 辅助进行设计、编写及调试，并参考了优秀的开源项目 [M5ReadPaper](https://github.com/shinemoon/M5ReadPaper)。
 
 ## 功能特性
 
@@ -215,7 +79,6 @@ Once converted, you can **directly copy the `.bin` font file to the `/fonts` dir
     *   *行间距*：支持在 1.5 倍与 2.0 倍之间切换（切换后会自动重新计算分页）。
     *   *清理过期阅读记录*：若手动删除了 `/books` 下的书籍，可在此一键清理对应的历史配置（.cfg）与分页索引（.idx）文件以释放空间。
 
-
 ## 快速上手
 
 ### 1. 前置准备
@@ -262,7 +125,7 @@ SD Card/
 ```
 
 ### Wi-Fi 无线传书
-1.  在书架页面，点击底部状态栏 of **“传书”** 按钮。
+1.  在书架页面，点击底部状态栏的 **“传书”** 按钮。
 2.  M5Paper 将自动建立一个局域网 Wi-Fi 热点。请将您的手机或电脑连接至屏幕上显示的 Wi-Fi 名称。
 3.  连接成功后，在手机/电脑的浏览器中输入屏幕上显示的 IP 地址（如 `http://192.168.4.1`）。
 4.  在传书网页中，选择电脑中的 TXT 书籍或自定义生成的 `.bin` 字体文件直接进行上传。
@@ -273,3 +136,138 @@ SD Card/
 python tools/ttf2bin.py input_font.ttf output_font.bin
 ```
 转换完成后，您可以**直接将生成的 `.bin` 字体文件拷贝至 SD 卡的 `/fonts` 目录下**，或者通过上述 **Wi-Fi 无线传书** 网页上传至设备，然后在设置页面中切换使用即可。
+
+---
+
+<a name="english"></a>
+# English Version
+
+A basic TXT ebook reader designed for the **M5Paper v1 and v1.1** (ESP32 + E-Ink) development kit.
+
+This project provides a Chinese reading implementation on the e-paper screen, featuring custom font rendering, background pagination indexing, custom wallpaper selection, and a web-based interface for transferring books and fonts over Wi-Fi.
+
+> [!NOTE]
+> This project is solely for personal learning and exploration. During the development process, AI was used to assist with design, coding, and debugging, with reference to the excellent [M5ReadPaper](https://github.com/shinemoon/M5ReadPaper) project.
+
+## Features
+
+*   **E-paper Interface**: High-contrast E-paper interface with a battery indicator, touch targets, and partial refresh support.
+*   **Chinese Text Support**:
+    *   Support for **UTF-8** and **GBK** encodings (automatic conversion).
+    *   Word wrapping and punctuation handling for Chinese characters.
+*   **Custom Font Subsystem**:
+    *   Renders custom binary font formats generated from `.ttf`.
+    *   **Dual-Font Support**: Includes two preset rendering styles (configurable via the Web UI):
+        *   *Fluency*: Smaller file size, faster loading, slightly aliased.
+        *   *Clarity*: Antialiased, smooth curves, larger file size.
+    *   **Font Caching**: Caches character glyphs in PSRAM to reduce page-turn latency.
+    *   **NotoSansSC Fallback**: Falls back to the built-in NotoSansSC font if the external font file is missing.
+*   **Reading Settings**:
+    *   Adjustable font sizes (ranging from 16px to 40px).
+    *   Adjustable line spacing (1.5x and 2.0x).
+*   **Pagination & Bookmarks**:
+    *   Background pagination indexing with cache saved as `.idx` files on the SD card.
+    *   Add and manage bookmarks per book.
+*   **Wi-Fi File Transfer (Web UI)**:
+    *   Runs a local Web Server on M5Paper to upload `.txt` books and `.bin` fonts directly from your phone or computer.
+    *   Select and preview font rendering styles ("Fluency" vs. "Clarity") right in the web browser before uploading.
+*   **Power & Storage Management**:
+    *   Wallpaper selection from images on the SD card.
+    *   Deep sleep integration (with optional boot-straight-to-reading feature).
+    *   Clearing reading records and cache.
+
+## Demos & Physical Screenshots
+
+*Below are placeholders for the planned physical photos showcasing the device and software. You can place corresponding images in `docs/images/` in the future to enable them:*
+
+| Bookshelf Interface | Reading Interface | Settings Page |
+| :---: | :---: | :---: |
+| ![Bookshelf UI](docs/images/bookshelf_ui.jpg) <br> *Device bookshelf screen* | ![Reading UI](docs/images/reading_ui.jpg) <br> *Device reading rendering* | ![Settings UI](docs/images/settings_ui.jpg) <br> *Device settings adjustments* |
+
+| Device Transfer Hotspot | Web Upload Client | Font Contrast Comparison |
+| :---: | :---: | :---: |
+| ![Hotspot Screen](docs/images/transfer_device_ui.jpg) <br> *Device hotspot info page* | ![Browser Client](docs/images/transfer_web_ui.jpg) <br> *Web client upload page* | ![Font Contrast](docs/images/font_comparison.jpg) <br> *Fluency vs. Clarity comparison* |
+
+## Operations
+
+The reader is operated via the touchscreen and the physical wheel button.
+
+### Reading Page
+*   **Page Turn (Touch)**: Tap the left 1/3 area of the screen to go to the previous page, and tap the right 1/3 area to go to the next page.
+*   **Page Turn (Wheel)**: Scroll the physical wheel button up/down to flip pages.
+*   **Clear Screen Ghosting**: Press down on the physical wheel button.
+*   **Open Reading Menu**: Tap the center 1/3 area of the screen.
+
+### Reading Menu
+*   **Return**: Tap the button in the top-left corner to return to the Bookshelf.
+*   **Jump**: Tap the button in the bottom-left corner to input a page number or percentage for precise jumping.
+*   **Close Menu**: Tap any blank area in the middle of the screen to close the menu.
+
+### Sleep & Wake
+*   **Low-Power Sleep**: Tap the **Sleep** button in the bottom-right corner of the reading menu to enter deep sleep immediately.
+*   **Wake Up Device**: Press and hold the physical wheel button inward for **3 seconds** to wake up.
+
+### Bookshelf Page
+*   **Book Selection**: Tap a book card to start reading. The most recently read book is automatically pinned to the top of the shelf.
+*   **Wi-Fi Transfer**: Tap **Transfer** in the bottom navigation bar to start a local hotspot, then connect via phone/computer and visit the displayed IP address to upload books/fonts.
+*   **Settings Page**: Tap **Settings** in the bottom navigation bar:
+    *   *Line Spacing*: Switch between 1.5x and 2.0x (automatically re-paginates).
+    *   *Clear Obsolete Progress*: One-click clearing of configurations (.cfg) and pagination indexes (.idx) for manually deleted books to free space.
+
+## Getting Started
+
+### 1. Prerequisites
+*   Install **PlatformIO Core (CLI)**. You can install it via pip:
+    ```bash
+    pip install -U platformio
+    ```
+    *(For alternative installation methods, refer to [PlatformIO CLI Installation Guide](https://docs.platformio.org/en/latest/core/installation/index.html))*
+*   An **SD Card** formatted to FAT32 inserted into the M5Paper.
+
+## Build and Flash
+1.  Clone or download this repository, and navigate to the project root:
+    ```bash
+    git clone <repository_url>
+    cd m5paper-ebook
+    ```
+2.  Connect your M5Paper to your computer via a USB-C cable.
+3.  Compile the project:
+    ```bash
+    pio run
+    ```
+4.  Upload the firmware to the device:
+    ```bash
+    pio run -t upload
+    ```
+5.  *(Optional)* Open the serial monitor to view logs:
+    ```bash
+    pio device monitor
+    ```
+
+## Usage & File Management
+
+### SD Card Directory Structure
+To ensure proper operation, insert a FAT32-formatted SD card. 
+*   **Auto-generated**: The system automatically creates `/configs` on the first boot, and **automatically creates `/books`, `/fonts`, and `/images`** when you enter the "WiFi Transfer" page or upload files.
+*   **Manual Copying**: If you are copying files offline via an SD card reader, you should manually prepare the following structure:
+
+```text
+SD Card/
+├── books/                  # Place your .txt ebooks here (create manually if copying via PC card reader)
+├── configs/                # Auto-generated global config, index files, and bookmarks
+├── fonts/                  # Place your custom binary font (.bin) files here
+└── images/                 # Place your lock screen wallpaper image files here
+```
+
+### Wi-Fi Book & Font Transfer
+1.  From the Bookshelf page, tap **"Transfer"** in the bottom navigation bar.
+2.  The M5Paper will start a local Wi-Fi hotspot. Connect your phone or computer to the Wi-Fi network displayed on the screen.
+3.  Open your web browser and navigate to the URL shown on the M5Paper display (e.g., `http://192.168.4.1`).
+4.  Use the web interface to upload your TXT books or custom binary font files.
+
+### Converting Custom Fonts
+You can convert TrueType fonts (`.ttf`) into the custom binary format compatible with this reader:
+```bash
+python tools/ttf2bin.py input_font.ttf output_font.bin
+```
+Once converted, you can **directly copy the `.bin` font file to the `/fonts` directory on your SD card**, or upload it via the Wi-Fi Transfer web interface, then select it in the Settings page.
