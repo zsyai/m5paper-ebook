@@ -47,11 +47,11 @@
 
 | 书架界面展示 | 阅读界面展示 | 设置页面展示 |
 | :---: | :---: | :---: |
-| ![书架界面占位符](docs/images/bookshelf_ui.jpg) <br> *设备主页书架* | ![阅读界面占位符](docs/images/reading_ui.jpg) <br> *设备阅读文本渲染* | ![设置页面占位符](docs/images/settings_ui.jpg) <br> *设备阅读参数调整* |
+| <img src="docs/images/bookshelf_ui.jpg" height="250"> <br> *设备主页书架* | <img src="docs/images/reading_ui.jpg" height="250"> <br> *设备阅读文本渲染* | <img src="docs/images/settings_ui.jpg" height="250"> <br> *设备阅读参数调整* |
 
 | 设备端传输界面 | 客户端传书网页 | 不同字体效果对比 |
 | :---: | :---: | :---: |
-| ![传输界面占位符](docs/images/transfer_device_ui.jpg) <br> *设备开热点传书界面* | ![传书网页占位符](docs/images/transfer_web_ui.jpg) <br> *浏览器端上传页面* | ![字体效果对比占位符](docs/images/font_comparison.jpg) <br> *流畅版 vs. 清晰版渲染对比* |
+| <img src="docs/images/transfer_device_ui.jpg" height="250"> <br> *设备开热点传书界面* | <img src="docs/images/transfer_web_ui.jpg" height="250"> <br> *浏览器端上传页面* | <img src="docs/images/font_comparison.jpg" height="250"> <br> *流畅版 vs. 清晰版渲染对比* |
 
 ## 基本操作
 
@@ -182,11 +182,11 @@ This project provides a Chinese reading implementation on the e-paper screen, fe
 
 | Bookshelf Interface | Reading Interface | Settings Page |
 | :---: | :---: | :---: |
-| ![Bookshelf UI](docs/images/bookshelf_ui.jpg) <br> *Device bookshelf screen* | ![Reading UI](docs/images/reading_ui.jpg) <br> *Device reading rendering* | ![Settings UI](docs/images/settings_ui.jpg) <br> *Device settings adjustments* |
+| <img src="docs/images/bookshelf_ui.jpg" height="250"> <br> *Device bookshelf screen* | <img src="docs/images/reading_ui.jpg" height="250"> <br> *Device reading rendering* | <img src="docs/images/settings_ui.jpg" height="250"> <br> *Device settings adjustments* |
 
 | Device Transfer Hotspot | Web Upload Client | Font Contrast Comparison |
 | :---: | :---: | :---: |
-| ![Hotspot Screen](docs/images/transfer_device_ui.jpg) <br> *Device hotspot info page* | ![Browser Client](docs/images/transfer_web_ui.jpg) <br> *Web client upload page* | ![Font Contrast](docs/images/font_comparison.jpg) <br> *Fluency vs. Clarity comparison* |
+| <img src="docs/images/transfer_device_ui.jpg" height="250"> <br> *Device hotspot info page* | <img src="docs/images/transfer_web_ui.jpg" height="250"> <br> *Web client upload page* | <img src="docs/images/font_comparison.jpg" height="250"> <br> *Fluency vs. Clarity comparison* |
 
 ## Operations
 
