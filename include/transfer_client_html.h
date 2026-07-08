@@ -867,7 +867,10 @@ function Tree(){this.table=new Uint16Array(16),this.trans=new Uint16Array(288)}f
 
                 let fontNameStr = "";
                 try {
-                    fontNameStr = font.names.fontFamily.zh || font.names.fontFamily.en || "";
+                    let f = font.names.fontFamily;
+                    if (f) {
+                        fontNameStr = f['zh'] || f['zh-cn'] || f['zh-CN'] || f['en'] || f['en-US'] || Object.values(f)[0] || "";
+                    }
                 } catch (e) {}
                 
                 if (!fontNameStr) {

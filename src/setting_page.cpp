@@ -122,6 +122,30 @@ void SettingPage::draw(LGFX_Sprite& canvas) {
   int right_arrow_center_x =
       screen_w - padding_x - fs * 1.5;  // Aligned with button center
   std::string font_name = ui.getFontName();
+
+  bool is_valid_utf8 = true;
+  if (!font_name.empty()) {
+      const uint8_t* p = reinterpret_cast<const uint8_t*>(font_name.c_str());
+      const uint8_t* end = p + font_name.size();
+      while (p < end) {
+          int bytes = 0;
+          Utf8Utils::getNextCharUnicode(p, end, bytes);
+          if (bytes == 0) {
+              is_valid_utf8 = false;
+              break;
+          }
+          p += bytes;
+      }
+  }
+
+  if (font_name.empty() || !is_valid_utf8) {
+      std::string path = ui.getFontPath();
+      size_t last_slash = path.find_last_of('/');
+      std::string filename = (last_slash == std::string::npos) ? path : path.substr(last_slash + 1);
+      size_t dot = filename.find_last_of('.');
+      if (dot != std::string::npos) filename = filename.substr(0, dot);
+      font_name = filename;
+  }
   if (font_name.empty()) font_name = "Default";
 
   int arrow_size = fs * 0.4;
@@ -186,7 +210,7 @@ void SettingPage::draw(LGFX_Sprite& canvas) {
   std::string lock_text = lock_enabled ? "开" : "关";
   txt_w = ui.getStringWidth(lock_text);
   ui.drawCachedString(lock_text, x_lock + (w_lock - txt_w) / 2,
-                      item_y + fs * 0.2);
+                      item_y);
 
   // Line 4: 壁纸文件 (Bottom half of Module 3)
   int line4_center_y = mod3_top + line_h + (line_h * 0.8) / 2;
@@ -244,7 +268,7 @@ void SettingPage::draw(LGFX_Sprite& canvas) {
   canvas.drawRoundRect(x_sel, y_sel, fs * 3.0, h_lock, 4, TFT_BLACK);
   txt_w = ui.getStringWidth("选择");
   ui.drawCachedString("选择", x_sel + (fs * 3.0 - txt_w) / 2,
-                      item_y + fs * 0.2);
+                      item_y);
 
   // Separator after Module 3
   canvas.drawFastHLine(padding_x, mod3_top + mod3_h, screen_w - 2 * padding_x,
@@ -262,7 +286,7 @@ void SettingPage::draw(LGFX_Sprite& canvas) {
   canvas.drawRoundRect(x_clean, y_clean, fs * 3.0, h_lock, 4, TFT_BLACK);
   txt_w = ui.getStringWidth("清理");
   ui.drawCachedString("清理", x_clean + (fs * 3.0 - txt_w) / 2,
-                      item_y + fs * 0.2);
+                      item_y);
 
   // Separator after Module 4
   canvas.drawFastHLine(padding_x, mod4_top + mod4_h, screen_w - 2 * padding_x,
@@ -280,7 +304,7 @@ void SettingPage::draw(LGFX_Sprite& canvas) {
   canvas.drawRoundRect(x_guide, y_guide, fs * 3.0, h_lock, 4, TFT_BLACK);
   txt_w = ui.getStringWidth("阅读");
   ui.drawCachedString("阅读", x_guide + (fs * 3.0 - txt_w) / 2,
-                      item_y + fs * 0.2);
+                      item_y);
 
   // Bottom Bar
   ui.drawBottomBar({"传书", "书架", "休眠"});
@@ -363,6 +387,30 @@ State SettingPage::handleEvent(const SystemMessage_t& msg) {
     int right_arrow_base_x = right_arrow_center_x - arrow_size / 2;
 
     std::string font_name = ui.getFontName();
+
+    bool is_valid_utf8 = true;
+    if (!font_name.empty()) {
+        const uint8_t* p = reinterpret_cast<const uint8_t*>(font_name.c_str());
+        const uint8_t* end = p + font_name.size();
+        while (p < end) {
+            int bytes = 0;
+            Utf8Utils::getNextCharUnicode(p, end, bytes);
+            if (bytes == 0) {
+                is_valid_utf8 = false;
+                break;
+            }
+            p += bytes;
+        }
+    }
+
+    if (font_name.empty() || !is_valid_utf8) {
+        std::string path = ui.getFontPath();
+        size_t last_slash = path.find_last_of('/');
+        std::string filename = (last_slash == std::string::npos) ? path : path.substr(last_slash + 1);
+        size_t dot = filename.find_last_of('.');
+        if (dot != std::string::npos) filename = filename.substr(0, dot);
+        font_name = filename;
+    }
     if (font_name.empty()) font_name = "Default";
 
     int label_w = ui.getStringWidth("字体");

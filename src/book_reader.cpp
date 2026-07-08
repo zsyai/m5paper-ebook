@@ -13,6 +13,14 @@ static TextEncoding detect_text_encoding(const uint8_t *buffer, size_t size)
     {
         return TextEncoding::UTF8;
     }
+    if (size >= 2 && buffer[0] == 0xFF && buffer[1] == 0xFE)
+    {
+        return TextEncoding::UTF16LE;
+    }
+    if (size >= 2 && buffer[0] == 0xFE && buffer[1] == 0xFF)
+    {
+        return TextEncoding::UTF16BE;
+    }
 
     size_t valid_utf8_chars = 0;
     size_t total_chars = 0;
@@ -83,6 +91,76 @@ static TextEncoding detect_text_encoding(const uint8_t *buffer, size_t size)
     }
 }
 
+static std::string convert_utf16le_to_utf8(const std::string& utf16_str) {
+    std::string utf8_str;
+    utf8_str.reserve(utf16_str.length() * 3 / 2);
+    const uint8_t* src = (const uint8_t*)utf16_str.c_str();
+    size_t len = utf16_str.length();
+    for (size_t i = 0; i + 1 < len; i += 2) {
+        uint16_t w1 = src[i] | (src[i+1] << 8);
+        if (i == 0 && w1 == 0xFEFF) continue;
+        uint32_t codepoint = w1;
+        if (w1 >= 0xD800 && w1 <= 0xDBFF && i + 3 < len) {
+            uint16_t w2 = src[i+2] | (src[i+3] << 8);
+            if (w2 >= 0xDC00 && w2 <= 0xDFFF) {
+                codepoint = 0x10000 + ((w1 - 0xD800) << 10) + (w2 - 0xDC00);
+                i += 2;
+            }
+        }
+        if (codepoint < 0x80) {
+            utf8_str.push_back((char)codepoint);
+        } else if (codepoint < 0x800) {
+            utf8_str.push_back((char)(0xC0 | (codepoint >> 6)));
+            utf8_str.push_back((char)(0x80 | (codepoint & 0x3F)));
+        } else if (codepoint < 0x10000) {
+            utf8_str.push_back((char)(0xE0 | (codepoint >> 12)));
+            utf8_str.push_back((char)(0x80 | ((codepoint >> 6) & 0x3F)));
+            utf8_str.push_back((char)(0x80 | (codepoint & 0x3F)));
+        } else {
+            utf8_str.push_back((char)(0xF0 | (codepoint >> 18)));
+            utf8_str.push_back((char)(0x80 | ((codepoint >> 12) & 0x3F)));
+            utf8_str.push_back((char)(0x80 | ((codepoint >> 6) & 0x3F)));
+            utf8_str.push_back((char)(0x80 | (codepoint & 0x3F)));
+        }
+    }
+    return utf8_str;
+}
+
+static std::string convert_utf16be_to_utf8(const std::string& utf16_str) {
+    std::string utf8_str;
+    utf8_str.reserve(utf16_str.length() * 3 / 2);
+    const uint8_t* src = (const uint8_t*)utf16_str.c_str();
+    size_t len = utf16_str.length();
+    for (size_t i = 0; i + 1 < len; i += 2) {
+        uint16_t w1 = (src[i] << 8) | src[i+1];
+        if (i == 0 && w1 == 0xFEFF) continue;
+        uint32_t codepoint = w1;
+        if (w1 >= 0xD800 && w1 <= 0xDBFF && i + 3 < len) {
+            uint16_t w2 = (src[i+2] << 8) | src[i+3];
+            if (w2 >= 0xDC00 && w2 <= 0xDFFF) {
+                codepoint = 0x10000 + ((w1 - 0xD800) << 10) + (w2 - 0xDC00);
+                i += 2;
+            }
+        }
+        if (codepoint < 0x80) {
+            utf8_str.push_back((char)codepoint);
+        } else if (codepoint < 0x800) {
+            utf8_str.push_back((char)(0xC0 | (codepoint >> 6)));
+            utf8_str.push_back((char)(0x80 | (codepoint & 0x3F)));
+        } else if (codepoint < 0x10000) {
+            utf8_str.push_back((char)(0xE0 | (codepoint >> 12)));
+            utf8_str.push_back((char)(0x80 | ((codepoint >> 6) & 0x3F)));
+            utf8_str.push_back((char)(0x80 | (codepoint & 0x3F)));
+        } else {
+            utf8_str.push_back((char)(0xF0 | (codepoint >> 18)));
+            utf8_str.push_back((char)(0x80 | ((codepoint >> 12) & 0x3F)));
+            utf8_str.push_back((char)(0x80 | ((codepoint >> 6) & 0x3F)));
+            utf8_str.push_back((char)(0x80 | (codepoint & 0x3F)));
+        }
+    }
+    return utf8_str;
+}
+
 static size_t map_converted_pos_to_raw_consumed(const std::string &raw, TextEncoding enc, size_t converted_pos)
 {
     const uint8_t *buf = (const uint8_t *)raw.c_str();
@@ -132,7 +210,19 @@ static size_t map_converted_pos_to_raw_consumed(const std::string &raw, TextEnco
                 acc_converted_bytes += 1;
                 i += 1;
             }
-            else if (i + 1 < raw_len && b >= 0xA1 && b <= 0xFE && buf[i + 1] >= 0xA1 && buf[i + 1] <= 0xFE)
+            else if (b >= 0x81 && b <= 0xFE && i + 3 < raw_len && buf[i+1] >= 0x30 && buf[i+1] <= 0x39 && buf[i+2] >= 0x81 && buf[i+2] <= 0xFE && buf[i+3] >= 0x30 && buf[i+3] <= 0x39)
+            {
+                if (b >= 0x90) {
+                   uint32_t offset = (b - 0x90) * 12600 + (buf[i+1] - 0x30) * 1260 + (buf[i+2] - 0x81) * 10 + (buf[i+3] - 0x30);
+                   uint32_t unicode = 0x10000 + offset;
+                   if (unicode < 0x110000) acc_converted_bytes += 4;
+                   else acc_converted_bytes += 3;
+                } else {
+                   acc_converted_bytes += 3; // placeholder
+                }
+                i += 4;
+            }
+            else if (i + 1 < raw_len && b >= 0x81 && b <= 0xFE && buf[i + 1] >= 0x40 && buf[i + 1] <= 0xFE && buf[i + 1] != 0x7F)
             {
                 uint16_t gbk_code = (uint16_t(b) << 8) | uint16_t(buf[i + 1]);
                 uint16_t uni = gbk_to_unicode_lookup(gbk_code);
@@ -147,19 +237,9 @@ static size_t map_converted_pos_to_raw_consumed(const std::string &raw, TextEnco
                 }
                 i += 2;
             }
-            else if ((b & 0xE0) == 0xC0 && i + 1 < raw_len && (buf[i + 1] & 0xC0) == 0x80)
-            {
-                acc_converted_bytes += 2;
-                i += 2;
-            }
-            else if ((b & 0xF0) == 0xE0 && i + 2 < raw_len && (buf[i + 1] & 0xC0) == 0x80 && (buf[i + 2] & 0xC0) == 0x80)
-            {
-                acc_converted_bytes += 3;
-                i += 3;
-            }
             else
             {
-                acc_converted_bytes += 3; // placeholder
+                acc_converted_bytes += 1; // placeholder or undefined
                 i += 1;
             }
 
@@ -168,6 +248,71 @@ static size_t map_converted_pos_to_raw_consumed(const std::string &raw, TextEnco
         }
         return raw_len;
     }
+
+    if (enc == TextEncoding::UTF16LE)
+    {
+        while (i + 1 < raw_len)
+        {
+            uint16_t w1 = buf[i] | (buf[i+1] << 8);
+            if (i == 0 && w1 == 0xFEFF) {
+                i += 2;
+                continue;
+            }
+            uint32_t codepoint = w1;
+            int step = 2;
+            if (w1 >= 0xD800 && w1 <= 0xDBFF && i + 3 < raw_len) {
+                uint16_t w2 = buf[i+2] | (buf[i+3] << 8);
+                if (w2 >= 0xDC00 && w2 <= 0xDFFF) {
+                    codepoint = 0x10000 + ((w1 - 0xD800) << 10) + (w2 - 0xDC00);
+                    step = 4;
+                }
+            }
+            
+            if (codepoint < 0x80) acc_converted_bytes += 1;
+            else if (codepoint < 0x800) acc_converted_bytes += 2;
+            else if (codepoint < 0x10000) acc_converted_bytes += 3;
+            else acc_converted_bytes += 4;
+            
+            i += step;
+            
+            if (acc_converted_bytes >= converted_pos)
+                return i;
+        }
+        return raw_len;
+    }
+
+    if (enc == TextEncoding::UTF16BE)
+    {
+        while (i + 1 < raw_len)
+        {
+            uint16_t w1 = (buf[i] << 8) | buf[i+1];
+            if (i == 0 && w1 == 0xFEFF) {
+                i += 2;
+                continue;
+            }
+            uint32_t codepoint = w1;
+            int step = 2;
+            if (w1 >= 0xD800 && w1 <= 0xDBFF && i + 3 < raw_len) {
+                uint16_t w2 = (buf[i+2] << 8) | buf[i+3];
+                if (w2 >= 0xDC00 && w2 <= 0xDFFF) {
+                    codepoint = 0x10000 + ((w1 - 0xD800) << 10) + (w2 - 0xDC00);
+                    step = 4;
+                }
+            }
+            
+            if (codepoint < 0x80) acc_converted_bytes += 1;
+            else if (codepoint < 0x800) acc_converted_bytes += 2;
+            else if (codepoint < 0x10000) acc_converted_bytes += 3;
+            else acc_converted_bytes += 4;
+            
+            i += step;
+            
+            if (acc_converted_bytes >= converted_pos)
+                return i;
+        }
+        return raw_len;
+    }
+
     return raw_len;
 }
 
@@ -198,7 +343,18 @@ bool BookReader::open(const std::string& path) {
   uint8_t detect_buffer[1024];
   size_t detect_size = file.read(detect_buffer, sizeof(detect_buffer));
   current_encoding = detect_text_encoding(detect_buffer, detect_size);
-  file.seek(0); // Reset file pointer
+  
+  file_data_start = 0;
+  if (current_encoding == TextEncoding::UTF8 && detect_size >= 3 && detect_buffer[0] == 0xEF && detect_buffer[1] == 0xBB && detect_buffer[2] == 0xBF) {
+      file_data_start = 3;
+  } else if (current_encoding == TextEncoding::UTF16LE && detect_size >= 2 && detect_buffer[0] == 0xFF && detect_buffer[1] == 0xFE) {
+      file_data_start = 2;
+  } else if (current_encoding == TextEncoding::UTF16BE && detect_size >= 2 && detect_buffer[0] == 0xFE && detect_buffer[1] == 0xFF) {
+      file_data_start = 2;
+  }
+  
+  current_page_start_offset = file_data_start;
+  file.seek(current_page_start_offset); 
   
   loadIndex(); // Try to load index
   
@@ -283,11 +439,38 @@ void BookReader::paginate(PageFontCache& cache, int screen_w, int screen_h) {
   }
 
   int end_pos = read_bytes;
-  while (end_pos > 0 && (buffer[end_pos - 1] & 0xC0) == 0x80) {
-    end_pos--;
-  }
-  if (end_pos > 0 && (buffer[end_pos - 1] & 0x80) != 0) {
-    end_pos--; 
+  if (current_encoding == TextEncoding::UTF16LE || current_encoding == TextEncoding::UTF16BE) {
+      if (end_pos % 2 != 0) end_pos--;
+      if (end_pos >= 2) {
+          uint16_t last_word = (current_encoding == TextEncoding::UTF16LE) 
+             ? (buffer[end_pos - 2] | (buffer[end_pos - 1] << 8))
+             : ((buffer[end_pos - 2] << 8) | buffer[end_pos - 1]);
+          if (last_word >= 0xD800 && last_word <= 0xDBFF) {
+              end_pos -= 2;
+          }
+      }
+  } else if (current_encoding == TextEncoding::GBK) {
+      size_t safe_end = 0;
+      while(safe_end < end_pos) {
+          uint8_t c = buffer[safe_end];
+          if (c >= 0x81 && c <= 0xFE && safe_end + 3 < end_pos && buffer[safe_end+1] >= 0x30 && buffer[safe_end+1] <= 0x39 && buffer[safe_end+2] >= 0x81 && buffer[safe_end+2] <= 0xFE && buffer[safe_end+3] >= 0x30 && buffer[safe_end+3] <= 0x39) {
+              if (safe_end + 4 > end_pos) break;
+              safe_end += 4;
+          } else if (c >= 0x81 && c <= 0xFE) {
+              if (safe_end + 2 > end_pos) break;
+              safe_end += 2;
+          } else {
+              safe_end++;
+          }
+      }
+      end_pos = safe_end;
+  } else {
+      while (end_pos > 0 && (buffer[end_pos - 1] & 0xC0) == 0x80) {
+        end_pos--;
+      }
+      if (end_pos > 0 && (buffer[end_pos - 1] & 0x80) != 0) {
+        end_pos--; 
+      }
   }
 
   std::string text(reinterpret_cast<char*>(buffer), end_pos);
@@ -295,6 +478,10 @@ void BookReader::paginate(PageFontCache& cache, int screen_w, int screen_h) {
 
   if (current_encoding == TextEncoding::GBK) {
       text = convert_gbk_to_utf8_lookup(text);
+  } else if (current_encoding == TextEncoding::UTF16LE) {
+      text = convert_utf16le_to_utf8(text);
+  } else if (current_encoding == TextEncoding::UTF16BE) {
+      text = convert_utf16be_to_utf8(text);
   }
 
   cache.build(text, font_path);
@@ -532,7 +719,7 @@ bool BookReader::buildIndex(PageFontCache& cache, int screen_w, int screen_h) {
     
     Serial.println("Building global index (optimized)...");
     page_index.clear();
-    uint32_t scan_pos = 0;
+    uint32_t scan_pos = file_data_start;
     
     size_t chunk_size = 4096;
     uint8_t* buffer = static_cast<uint8_t*>(malloc(chunk_size));
@@ -555,13 +742,40 @@ bool BookReader::buildIndex(PageFontCache& cache, int screen_w, int screen_h) {
             int read_bytes = file.read(buffer, chunk_size);
             if (read_bytes <= 0) break;
             
-            // Handle UTF-8 truncation at chunk boundary
+            // Handle chunk boundary truncation
             int end_pos = read_bytes;
-            while (end_pos > 0 && (buffer[end_pos - 1] & 0xC0) == 0x80) {
-                end_pos--;
-            }
-            if (end_pos > 0 && (buffer[end_pos - 1] & 0x80) != 0) {
-                end_pos--; 
+            if (current_encoding == TextEncoding::UTF16LE || current_encoding == TextEncoding::UTF16BE) {
+                if (end_pos % 2 != 0) end_pos--;
+                if (end_pos >= 2) {
+                    uint16_t last_word = (current_encoding == TextEncoding::UTF16LE) 
+                       ? (buffer[end_pos - 2] | (buffer[end_pos - 1] << 8))
+                       : ((buffer[end_pos - 2] << 8) | buffer[end_pos - 1]);
+                    if (last_word >= 0xD800 && last_word <= 0xDBFF) {
+                        end_pos -= 2;
+                    }
+                }
+            } else if (current_encoding == TextEncoding::GBK) {
+                size_t safe_end = 0;
+                while(safe_end < end_pos) {
+                    uint8_t c = buffer[safe_end];
+                    if (c >= 0x81 && c <= 0xFE && safe_end + 3 < end_pos && buffer[safe_end+1] >= 0x30 && buffer[safe_end+1] <= 0x39 && buffer[safe_end+2] >= 0x81 && buffer[safe_end+2] <= 0xFE && buffer[safe_end+3] >= 0x30 && buffer[safe_end+3] <= 0x39) {
+                        if (safe_end + 4 > end_pos) break;
+                        safe_end += 4;
+                    } else if (c >= 0x81 && c <= 0xFE) {
+                        if (safe_end + 2 > end_pos) break;
+                        safe_end += 2;
+                    } else {
+                        safe_end++;
+                    }
+                }
+                end_pos = safe_end;
+            } else {
+                while (end_pos > 0 && (buffer[end_pos - 1] & 0xC0) == 0x80) {
+                    end_pos--;
+                }
+                if (end_pos > 0 && (buffer[end_pos - 1] & 0x80) != 0) {
+                    end_pos--; 
+                }
             }
             
             if (end_pos == 0 && read_bytes > 0) {
@@ -572,6 +786,10 @@ bool BookReader::buildIndex(PageFontCache& cache, int screen_w, int screen_h) {
             std::string chunk_text(reinterpret_cast<char*>(buffer), end_pos);
             if (current_encoding == TextEncoding::GBK) {
                 chunk_text = convert_gbk_to_utf8_lookup(chunk_text);
+            } else if (current_encoding == TextEncoding::UTF16LE) {
+                chunk_text = convert_utf16le_to_utf8(chunk_text);
+            } else if (current_encoding == TextEncoding::UTF16BE) {
+                chunk_text = convert_utf16be_to_utf8(chunk_text);
             }
             
             const uint8_t* p = reinterpret_cast<const uint8_t*>(chunk_text.c_str());
@@ -634,7 +852,7 @@ bool BookReader::buildIndex(PageFontCache& cache, int screen_w, int screen_h) {
                 page_end = p;
             }
             
-            if (current_encoding == TextEncoding::GBK) {
+            if (current_encoding == TextEncoding::GBK || current_encoding == TextEncoding::UTF16LE || current_encoding == TextEncoding::UTF16BE) {
                 size_t converted_consumed = page_end - chunk_start;
                 size_t raw_consumed = map_converted_pos_to_raw_consumed(std::string(reinterpret_cast<char*>(buffer), end_pos), current_encoding, converted_consumed);
                 current_page_offset += raw_consumed;

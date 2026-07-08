@@ -8,6 +8,8 @@
 enum class TextEncoding {
     UTF8,
     GBK,
+    UTF16LE,
+    UTF16BE,
     AUTO_DETECT
 };
 
@@ -73,6 +75,7 @@ class BookReader {
   std::string font_path;
   bool lock_screen_enabled;
   std::string lock_screen_path;
+  uint32_t file_data_start = 0;
   
   void paginate(PageFontCache& cache, int screen_w, int screen_h);
 

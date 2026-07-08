@@ -100,22 +100,47 @@ std::string convert_gbk_to_utf8_lookup(const std::string &gbk_input)
             continue;
         }
 
-        // GBK双字节字符
+        // GB18030 4-byte sequence check
+        if (byte1 >= 0x81 && byte1 <= 0xFE && i + 3 < len)
+        {
+            uint8_t byte2 = buf[i + 1];
+            if (byte2 >= 0x30 && byte2 <= 0x39) {
+                uint8_t byte3 = buf[i + 2];
+                uint8_t byte4 = buf[i + 3];
+                if (byte3 >= 0x81 && byte3 <= 0xFE && byte4 >= 0x30 && byte4 <= 0x39) {
+                    if (byte1 >= 0x90) {
+                        uint32_t offset = (byte1 - 0x90) * 12600 + (byte2 - 0x30) * 1260 + (byte3 - 0x81) * 10 + (byte4 - 0x30);
+                        uint32_t unicode = 0x10000 + offset;
+                        if (unicode < 0x110000) {
+                            result += (char)(0xF0 | (unicode >> 18));
+                            result += (char)(0x80 | ((unicode >> 12) & 0x3F));
+                            result += (char)(0x80 | ((unicode >> 6) & 0x3F));
+                            result += (char)(0x80 | (unicode & 0x3F));
+                        } else {
+                            result += "□";
+                        }
+                    } else {
+                        result += "□";
+                    }
+                    i += 4;
+                    continue;
+                }
+            }
+        }
+
+        // GBK双字节字符 (GBK ranges: byte1 0x81-0xFE, byte2 0x40-0xFE)
         if (i + 1 < len)
         {
             uint8_t byte2 = buf[i + 1];
 
             // 检查是否为合法GBK范围
-            if (byte1 >= 0xA1 && byte1 <= 0xFE && byte2 >= 0xA1 && byte2 <= 0xFE)
+            if (byte1 >= 0x81 && byte1 <= 0xFE && byte2 >= 0x40 && byte2 <= 0xFE && byte2 != 0x7F)
             {
                 uint16_t gbk_code = (byte1 << 8) | byte2;
                 uint16_t unicode = gbk_to_unicode_lookup(gbk_code);
 
-                //                Serial.printf("[GBK_CONVERT] GBK=0x%04X -> Unicode=0x%04X\n", gbk_code, unicode);
-
                 if (unicode != 0)
                 {
-                    // 找到对应的Unicode，转换为UTF8
                     uint8_t utf8_bytes[4];
                     int utf8_len = utf8_encode(unicode, utf8_bytes);
                     for (int j = 0; j < utf8_len; j++)
@@ -125,12 +150,7 @@ std::string convert_gbk_to_utf8_lookup(const std::string &gbk_input)
                 }
                 else
                 {
-                    // 查表未找到，使用替代字符
                     result += "□"; // 使用方框替代未知字符
-
-#if DBG_GBK_UNICODE_TABLE
-                    Serial.printf("[GBK_CONVERT] 未找到映射: GBK=0x%04X\n", gbk_code);
-#endif
                 }
 
                 i += 2;

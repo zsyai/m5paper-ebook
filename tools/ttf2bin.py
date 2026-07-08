@@ -103,7 +103,28 @@ def ttf_to_bin(ttf_path, bin_path, font_size=24, filter_chars=None):
         f.write(struct.pack('<B', font_size))
         f.write(struct.pack('<B', 3)) # version
         try:
-            font_name_str = font['name'].getDebugName(1)
+            name_records = font['name'].names
+            best_name = None
+            
+            def get_name(platforms):
+                for plat in platforms:
+                    for record in name_records:
+                        if record.nameID == 1 and record.platformID == plat:
+                            if plat == 1 and record.langID != 0:
+                                continue
+                            return record.toUnicode()
+                return None
+            
+            best_name = get_name([3, 0])
+            if not best_name:
+                best_name = get_name([1])
+            if not best_name: 
+                for record in name_records:
+                    if record.nameID == 1:
+                        best_name = record.toUnicode()
+                        break
+            
+            font_name_str = best_name
         except Exception:
             font_name_str = None
         if not font_name_str:
