@@ -10,4 +10,7 @@ public:
     
     // Scans for available font files on SD card.
     static std::vector<std::string> scanAvailableFonts();
+
+    // "内置" for the built-in font, else the file name without extension.
+    static std::string displayName(const std::string& path);
 };

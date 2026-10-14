@@ -170,7 +170,7 @@ void UserGuidePage::draw(LGFX_Sprite& canvas) {
   canvas.drawLine(col_w, 0, col_w, bar_h, TFT_BLACK);
 
   // Top Right: Battery
-  ui.drawBattery(canvas, canvas.width() - 20, text_y_offset);
+  ui.drawBattery(canvas.width() - 20, text_y_offset);
   
   // Thick line at bottom of header
   canvas.fillRect(0, bar_h - 4, screen_w, 4, TFT_BLACK);

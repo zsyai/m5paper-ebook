@@ -1,141 +1,123 @@
 #include "ui_manager.h"
 #include "state_machine.h"
 #include "utf8_utils.h"
+#include "core/perf_trace.h"
+#include "book/page_layout.h"
+#include "fonts/font_cache_store.h"
+#include "hal/display.h"
+#include "hal/input.h"
+#include "ui/text_renderer.h"
+#include "ui/widgets/bars.h"
 
 #include <M5Unified.h>
 #include <SD.h>
 #include <esp_sleep.h>
 #include <cstring>
 
-const int PADDING_X = 20;
-const int PADDING_Y = 20;
-
 void UIManager::init() {
-  fontLoaded = loadFont();
-  bookReader.loadGlobalConfig();
-  settingPage.init();
+  PERF_SCOPE("UIManager::init");
+  settings_.Load();
+  applyReadingStyle();
+  painter_.set_font_path(getUiFontPath());
+  uiCache.setBuiltinFallbackOnly(true);
+  uiCache.setTtfPixelSize(kUiFontPixelSize);
+  pageCache.setTtfPixelSize(settings_.body_font_size);
   
   canvas.setPsram(true);
   canvas.setColorDepth(lgfx::color_depth_t::grayscale_8bit);
-  canvas.createSprite(M5.Display.width(), M5.Display.height());
-  
+  {
+    PERF_SCOPE("canvas.createSprite");
+    canvas.createSprite(M5.Display.width(), M5.Display.height());
+  }
+  updateCanvasRotation();
+
   M5.Display.setEpdMode(lgfx::epd_mode_t::epd_text);
 }
 
 void UIManager::openBook(const std::string& path, bool show_loading) {
+  PERF_SCOPE("UIManager::openBook");
   size_t last_slash = path.find_last_of('/');
   std::string filename = (last_slash == std::string::npos) ? path : path.substr(last_slash + 1);
-  std::string config_path = "/configs/" + filename + ".idx";
-  
-  bool need_index = !SD.exists(config_path.c_str());
   
   if (show_loading) {
-      std::string loading_text;
-      if (need_index) {
-          loading_text = "正在分页，请稍候...";
-      } else {
-          int screen_w = canvas.width();
-          int max_text_w = screen_w - 80; // Box padding 40, Screen padding 40
-          std::string prefix = "正在打开 ";
-          std::string display_name = filename;
-          
-          buildFontCache(prefix + display_name);
-          if (getStringWidth(prefix + display_name) > max_text_w) {
-              while (!display_name.empty() && 
-                     getStringWidth(prefix + display_name + "...") > max_text_w) {
-                  do {
-                      if (display_name.empty()) break;
-                      uint8_t c = display_name.back();
-                      display_name.pop_back();
-                      if ((c & 0xC0) != 0x80) {
-                          break;
-                      }
-                  } while (true);
-              }
-              display_name += "...";
-          }
-          loading_text = prefix + display_name;
-      }
-      
-      showPromptBox(loading_text);
-  } else {
-      canvas.fillScreen(TFT_WHITE);
-      M5.Display.setEpdMode(lgfx::epd_mode_t::epd_fast);
-      canvas.pushSprite(&M5.Display, 0, 0);
+      const int max_text_w = canvas.width() - 80; // Box padding 40, Screen padding 40
+      const std::string prefix = "正在打开 ";
+      buildFontCache(prefix + filename + "...");
+      showPromptBox(prefix + reader::ui::Ellipsize(
+                                 uiCache, filename,
+                                 max_text_w - getStringWidth(prefix)));
   }
+  // Without a prompt (boot restore) the page itself is the first frame; it
+  // is drawn with a full GC16 refresh (reading_refresh_ restarted), so no separate
+  // blank frame (~0.7 s of push + refresh) is needed.
 
   if (bookReader.open(path)) {
-    pageTurnCount = 0;
+    reading_refresh_.Restart();
+    layout_dirty_ = false;
+    resolvedBodyFontPath();  // persist a replacement if the font is gone
     
     // Load config first to get old position
     bookReader.loadConfig(path);
-    
-    if (need_index || bookReader.isIndexEmpty()) {
-        bookReader.buildIndex(pageCache, canvas.width() - 2 * PADDING_X, canvas.height() - 2 * PADDING_Y);
-        bookReader.saveIndex();
-        bookReader.saveConfig(); // Save the updated record!
-    }
-    
     saveGlobalConfig(path);
     
-    bookReader.readCurrentPage(pageCache, canvas.width() - 2 * PADDING_X, canvas.height() - 2 * PADDING_Y);
-    drawReadingView();
+    // Lay out the saved page. A stored page index is loaded here (a few
+    // ms); a missing or stale one is built in the background
+    // (backgroundStep()). The reader page draws the page when it is shown.
+    const reader::book::TextArea area = textArea();
+    bookReader.readCurrentPage(pageCache, area.w, area.h);
+    bookReader.prepareIndex(pageCache, area.w, area.h);
+    PERF_VALUE("openBook.index_ready", bookReader.isIndexComplete());
   }
 }
 
+void UIManager::refreshBookLayout() {
+  if (!layout_dirty_) return;
+  layout_dirty_ = false;
+  if (bookReader.getBookPath().empty()) return;
+  resolvedBodyFontPath();
+  const reader::book::TextArea area = textArea();
+  bookReader.readCurrentPage(pageCache, area.w, area.h);
+  bookReader.prepareIndex(pageCache, area.w, area.h);
+}
+
+bool UIManager::hasBackgroundWork() const {
+  if (!background_enabled_) return false;
+  return bookReader.hasPendingIndex() || pageCache.needsFontCacheBuild() ||
+         uiCache.needsFontCacheBuild();
+}
+
+void UIManager::backgroundStep() {
+  // Page index first (page numbers), then the body and UI TTF glyph caches.
+  if (!bookReader.hasPendingIndex()) {
+    if (!pageCache.stepFontCacheBuild(kBackgroundStepMs)) {
+      uiCache.stepFontCacheBuild(kBackgroundStepMs);
+    }
+    return;
+  }
+  if (!bookReader.stepIndex(pageCache, kBackgroundStepMs)) return;
+  // Pages that show page numbers switch from "…" to the final numbers.
+  if (currentPage) currentPage->onIndexReady();
+}
+
 void UIManager::nextPage() {
-  pageTurnCount++;
-  bookReader.nextPage(pageCache, canvas.width() - 2 * PADDING_X, canvas.height() - 2 * PADDING_Y);
+  PERF_SCOPE("UIManager::nextPage");
+  reading_refresh_.Count();
+  const reader::book::TextArea area = textArea();
+  bookReader.nextPage(pageCache, area.w, area.h);
   drawReadingView();
 }
 
 void UIManager::prevPage() {
-  pageTurnCount++;
-  bookReader.prevPage(pageCache, canvas.width() - 2 * PADDING_X, canvas.height() - 2 * PADDING_Y);
+  PERF_SCOPE("UIManager::prevPage");
+  reading_refresh_.Count();
+  if (bookReader.needsIndexForPrevPage()) {
+    showPromptBox("加载中...");
+    bookReader.indexUntilCurrentPage(pageCache);
+  }
+  const reader::book::TextArea area = textArea();
+  bookReader.prevPage(pageCache, area.w, area.h);
   drawReadingView();
 }
-
-class FileWrapper : public lgfx::v1::DataWrapper {
- private:
-  fs::File _file;
- public:
-  FileWrapper(fs::File file) : _file(file) {
-    need_transaction = true;
-  }
-  int read(uint8_t *buf, uint32_t len) override {
-    return _file.read(buf, len);
-  }
-  void skip(int32_t offset) override {
-    _file.seek(_file.position() + offset);
-  }
-  bool seek(uint32_t offset) override {
-    return _file.seek(offset);
-  }
-  void close(void) override {
-    _file.close();
-  }
-  int32_t tell(void) override {
-    return _file.position();
-  }
-};
-
-bool UIManager::loadFont() {
-  fs::File file = SD.open("/font.ttf");
-  if (!file) {
-    Serial.println("Failed to open /font.ttf from SD");
-    return false;
-  }
-
-  FileWrapper wrapper(file);
-  if (M5.Display.loadFont(&wrapper)) {
-    Serial.println("Font loaded successfully via wrapper.");
-    return true;
-  }
-  Serial.println("Failed to load font via wrapper.");
-  return false;
-}
-
-
 
 void UIManager::handleInput() {
   // Handle Wheel
@@ -175,359 +157,224 @@ void UIManager::handleInput() {
 
 
 void UIManager::drawReadingView(bool forceFullRefresh) {
+  PERF_SCOPE("UIManager::drawReadingView");
+  renderReadingView();
+  if (forceFullRefresh || reading_refresh_.Due(settings_.full_refresh_pages)) {
+    Serial.println("Full refresh triggered.");
+    reading_refresh_.Restart();
+    pushCanvas(lgfx::epd_mode_t::epd_quality);
+  } else {
+    pushCanvas(lgfx::epd_mode_t::epd_text);
+  }
+}
+
+void UIManager::renderReadingView() {
   canvas.fillScreen(TFT_WHITE);
   
+  const reader::book::TextArea area = textArea();
   std::string text = bookReader.getPageText();
   if (text.empty()) {
     buildFontCache("文件为空或读取失败");
-    drawCachedString("文件为空或读取失败", PADDING_X, PADDING_Y);
+    drawCachedString("文件为空或读取失败", area.x, area.y);
   } else {
-    buildFontCache(text);
-    drawCachedString(text, PADDING_X, PADDING_Y);
+    // Same path as BookReader::paginate, so the body font is not reopened.
+    const reader::book::ReadingStyle& style = bookReader.style();
+    pageCache.build(text, style.font_path);
+    drawBodyText(text, area.x, area.y, area.w, area.h);
   }
-  
-  if (forceFullRefresh || pageTurnCount % 5 == 0) {
-    M5.Display.setEpdMode(lgfx::epd_mode_t::epd_quality);
-    Serial.println("Full refresh triggered.");
-    pageTurnCount = 0;
-  } else {
-    M5.Display.setEpdMode(lgfx::epd_mode_t::epd_text);
-  }
-  
-  canvas.pushSprite(&M5.Display, 0, 0);
 }
 
-void UIManager::drawReaderMenu() {
-  pageTurnCount++; // Increment shared counter
-  
-  if (pageTurnCount % 5 == 0) {
-    M5.Display.setEpdMode(lgfx::epd_mode_t::epd_quality);
-    Serial.println("Reader menu full refresh triggered.");
-  } else {
-    M5.Display.setEpdMode(lgfx::epd_mode_t::epd_text);
+void UIManager::drawBodyText(const std::string& text, int x, int y, int w,
+                             int h) {
+  const reader::book::ReadingStyle& style = bookReader.style();
+  const int fs = pageCache.getFontSize();
+  const int line_h = style.LineHeight(fs);
+  reader::ui::DrawText(canvas, pageCache, text, x, y, line_h);
+  if (style.line_underline) {
+    reader::ui::DrawLineGuides(canvas, x, y, w, h, fs, line_h);
   }
-
-  int screen_w = canvas.width();
-  int screen_h = canvas.height();
-  int font_size = pageCache.getFontSize();
-  int row_h = font_size * 2.5;
-  int bar_h = row_h * 2;
-  int text_y_offset = (row_h - font_size) / 2;
-  int col_w = screen_w / 2;
-
-  // Draw Top Bar
-  canvas.fillRect(0, 0, screen_w, bar_h, TFT_WHITE);
-  canvas.fillRect(0, bar_h - 4, screen_w, 4, TFT_BLACK); // Thick line
-  
-  // Top Left: "返回" (Row 1)
-  std::string back_text = "返回";
-  buildFontCache(back_text);
-  int back_w = getStringWidth(back_text);
-  drawCachedString(back_text, col_w / 2 - back_w / 2, text_y_offset);
-  
-  // Draw vertical separator for "返回" button (only in Row 1)
-  canvas.drawLine(col_w, 0, col_w, row_h, TFT_BLACK);
-
-  // Top Right: Battery (Row 1)
-  drawBattery(canvas, canvas.width() - 20, text_y_offset);
-
-  // Draw separator line between Row 1 and Row 2
-  canvas.drawLine(0, row_h, screen_w, row_h, TFT_BLACK);
-
-  // Row 2: Filename
-  std::string book_path = bookReader.getBookPath();
-  size_t last_slash = book_path.find_last_of('/');
-  std::string filename = (last_slash == std::string::npos) ? book_path : book_path.substr(last_slash + 1);
-  
-  // Truncate filename if too long
-  int max_name_w = screen_w - 40;
-  buildFontCache(filename);
-  if (getStringWidth(filename) > max_name_w) {
-      while (!filename.empty() && 
-             getStringWidth(filename + "...") > max_name_w) {
-          do {
-              if (filename.empty()) break;
-              uint8_t c = filename.back();
-              filename.pop_back();
-              if ((c & 0xC0) != 0x80) {
-                  break;
-              }
-          } while (true);
-      }
-      filename += "...";
-      buildFontCache(filename);
-  }
-  
-  int filename_w = getStringWidth(filename);
-  int filename_x = screen_w / 2 - filename_w / 2;
-  int text_y_offset2 = row_h + (row_h - font_size) / 2;
-  drawCachedString(filename, filename_x, text_y_offset2);
-
-  // Draw Bottom Bar
-  bool is_user_guide = isReadingUserGuide();
-  int bottom_h = is_user_guide ? row_h : row_h * 2;
-  int bottom_y = screen_h - bottom_h;
-  canvas.fillRect(0, bottom_y, screen_w, bottom_h, TFT_WHITE);
-  canvas.fillRect(0, bottom_y, screen_w, 4, TFT_BLACK); // Thick line at top of bar
-
-  if (is_user_guide) {
-      // Draw progress centered in the 100px bar
-      int current_page = bookReader.getCurrentPageIndex() + 1;
-      int total_pages = bookReader.getTotalPages();
-      float progress = bookReader.getProgress();
-      
-      char prog_str[32];
-      snprintf(prog_str, sizeof(prog_str), "%d/%d  %.1f%%", current_page, total_pages, progress);
-      std::string prog_text = prog_str;
-      buildFontCache(prog_text);
-      int prog_w = getStringWidth(prog_text);
-      drawCachedString(prog_text, (screen_w - prog_w) / 2, bottom_y + (bottom_h - font_size) / 2);
-  } else {
-      // Row 1: Progress
-      int current_page = bookReader.getCurrentPageIndex() + 1;
-      int total_pages = bookReader.getTotalPages();
-      float progress = bookReader.getProgress();
-      
-      char prog_str[32];
-      snprintf(prog_str, sizeof(prog_str), "%d/%d  %.1f%%", current_page, total_pages, progress);
-      std::string prog_text = prog_str;
-      buildFontCache(prog_text);
-      int prog_w = getStringWidth(prog_text);
-      drawCachedString(prog_text, (screen_w - prog_w) / 2, bottom_y + (row_h - font_size) / 2);
-
-      // Draw line separating the two rows
-      canvas.drawLine(0, bottom_y + row_h, screen_w, bottom_y + row_h, TFT_BLACK);
-
-      // Row 2: Buttons
-      int row2_y = bottom_y + row_h;
-
-      // Bottom Left: "跳转"
-      std::string jump_text = "跳转";
-      buildFontCache(jump_text);
-      int jump_w = getStringWidth(jump_text);
-      drawCachedString(jump_text, col_w / 2 - jump_w / 2, row2_y + (row_h - font_size) / 2);
-
-      // Bottom Right: "休眠"
-      std::string sleep_text = "休眠";
-      buildFontCache(sleep_text);
-      int sleep_w = getStringWidth(sleep_text);
-      drawCachedString(sleep_text, col_w + col_w / 2 - sleep_w / 2, row2_y + (row_h - font_size) / 2);
-
-      // Draw vertical separator in row 2
-      canvas.drawLine(col_w, row2_y, col_w, screen_h, TFT_BLACK);
-  }
-
-  canvas.pushSprite(&M5.Display, 0, 0);
 }
 
-void UIManager::drawReaderJumpMenu(const std::string& input) {
-  pageTurnCount++;
-  if (pageTurnCount % 5 == 0) {
-    M5.Display.setEpdMode(lgfx::epd_mode_t::epd_quality);
-    Serial.println("Jump menu full refresh triggered.");
-    pageTurnCount = 0;
+void UIManager::pushReaderOverlay(bool quiet, lgfx::epd_mode_t normal_mode) {
+  lgfx::epd_mode_t mode = lgfx::epd_mode_t::epd_text;
+  if (!quiet) {
+    mode = reading_refresh_.CountFrame(settings_.full_refresh_pages)
+               ? lgfx::epd_mode_t::epd_quality
+               : normal_mode;
+  }
+  pushCanvas(mode);
+}
+
+std::string UIManager::bookTitle() const {
+  const std::string path = bookReader.getBookPath();
+  const size_t slash = path.find_last_of('/');
+  return (slash == std::string::npos) ? path : path.substr(slash + 1);
+}
+
+void UIManager::drawBodyPreview(const reader::ui::Rect& box) {
+  PERF_SCOPE("UIManager::drawBodyPreview");
+  // Two paragraphs without leading spaces, so turning the paragraph indent
+  // on shows a visible change.
+  static const char kSample[] =
+      "滚滚长江东逝水，浪花淘尽英雄。是非成败转头空。青山依旧在，几度夕阳红。"
+      "白发渔樵江渚上，惯看秋月春风。一壶浊酒喜相逢。古今多少事，都付笑谈中。\n"
+      "话说天下大势，分久必合，合久必分。周末七国分争，并入于秦。及秦灭之后，"
+      "楚、汉分争，又并入于汉。汉朝自高祖斩白蛇而起义，一统天下，后来光武中兴，"
+      "传至献帝，遂分为三国。";
+  const reader::book::ReadingStyle& style = bookReader.style();
+  // Opens the body font; layout only needs its glyph index.
+  pageCache.build(std::string(), style.font_path);
+  reader::book::LayoutParams layout;
+  layout.text_w = box.w;
+  layout.text_h = box.h;
+  layout.font_size = pageCache.getFontSize();
+  layout.line_height = style.LineHeight(layout.font_size);
+  layout.paragraph_indent = style.paragraph_indent;
+  reader::book::LayoutCursor cursor;
+  cursor.paragraph_start = true;
+  bool filled = false;
+  std::string text;
+  reader::book::MeasurePage(reinterpret_cast<const uint8_t*>(kSample),
+                            sizeof(kSample) - 1, layout, pageCache, &cursor,
+                            &filled, &text);
+  pageCache.build(text, style.font_path);
+  drawBodyText(text, box.x, box.y, box.w, box.h);
+}
+
+std::string UIManager::progressText() const {
+  // Page numbers are final only once the index is complete. While it is
+  // being built: "N/…" when the current page is already indexed, "…"
+  // otherwise, and the percentage is by byte offset.
+  char buf[40];
+  int page = bookReader.getCurrentPageIndex();
+  float progress = bookReader.getProgress();
+  if (bookReader.isIndexComplete()) {
+    snprintf(buf, sizeof(buf), "%d/%d  %.1f%%", page + 1,
+             bookReader.getTotalPages(), progress);
+  } else if (page >= 0) {
+    snprintf(buf, sizeof(buf), "%d/…  %.1f%%", page + 1, progress);
   } else {
-    M5.Display.setEpdMode(lgfx::epd_mode_t::epd_fast);
+    snprintf(buf, sizeof(buf), "…  %.1f%%", progress);
   }
-
-  int screen_w = canvas.width();
-  int screen_h = canvas.height();
-  
-  int font_size = pageCache.getFontSize();
-  int box_w = static_cast<int>(font_size * 9.44);
-  int box_h = static_cast<int>(font_size * 11.11);
-  int box_x = (screen_w - box_w) / 2;
-  int box_y = (screen_h - box_h) / 2;
-
-  int input_box_h = font_size * 2;
-  int input_box_y = box_y - input_box_h - 10;
-  int total_text_y = input_box_y - font_size - 5;
-  int btn_y = box_y + box_h + 10;
-  int btn_h = font_size * 2;
-  
-  int modal_min_y = total_text_y - 10;
-  int modal_max_y = btn_y + btn_h + 10;
-  
-  // Fill entire modal background to prevent bleeding
-  canvas.fillRect(box_x - 10, modal_min_y, box_w + 20, modal_max_y - modal_min_y, TFT_WHITE);
-  canvas.drawRect(box_x - 10, modal_min_y, box_w + 20, modal_max_y - modal_min_y, TFT_BLACK);
-
-  canvas.fillRect(box_x, box_y, box_w, box_h, TFT_WHITE);
-  canvas.drawRect(box_x, box_y, box_w, box_h, TFT_BLACK);
-
-  for (int i = 1; i < 3; ++i) {
-      canvas.drawLine(box_x + i * (box_w / 3), box_y, box_x + i * (box_w / 3), box_y + box_h, TFT_BLACK);
-  }
-  for (int i = 1; i < 4; ++i) {
-      canvas.drawLine(box_x, box_y + i * (box_h / 4), box_x + box_w, box_y + i * (box_h / 4), TFT_BLACK);
-  }
-
-
-  std::vector<std::string> labels = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "返回", "0", "删除"};
-  
-  for (int i = 0; i < 12; ++i) {
-      int col = i % 3;
-      int row = i / 3;
-      int cell_x = box_x + col * (box_w / 3);
-      int cell_y = box_y + row * (box_h / 4);
-      
-      std::string label = labels[i];
-      buildFontCache(label);
-      int txt_w = getStringWidth(label);
-      int text_x = cell_x + (box_w / 3 - txt_w) / 2;
-      int text_y = cell_y + (box_h / 4 - font_size) / 2;
-      drawCachedString(label, text_x, text_y);
-  }
-
-
-  canvas.fillRect(box_x, input_box_y, box_w, input_box_h, TFT_WHITE);
-  canvas.drawRect(box_x, input_box_y, box_w, input_box_h, TFT_BLACK);
-  
-  buildFontCache(input);
-  int txt_w = getStringWidth(input);
-  int text_x = box_x + 10;
-  int text_y = input_box_y + (input_box_h - font_size) / 2;
-  drawCachedString(input, text_x, text_y);
-
-  // Draw total pages
-  int total_pages = bookReader.getTotalPages();
-  std::string total_text = "共 " + std::to_string(total_pages) + " 页";
-  buildFontCache(total_text);
-  int total_txt_w = getStringWidth(total_text);
-  int total_text_x = box_x + box_w - total_txt_w - 10;
-  drawCachedString(total_text, total_text_x, total_text_y);
-
-
-  int btn_w = (box_w - 20) / 2;
-  
-  int btn1_x = box_x;
-  int btn2_x = box_x + box_w - btn_w;
-  
-  canvas.fillRect(btn1_x, btn_y, btn_w, btn_h, TFT_WHITE);
-  canvas.drawRect(btn1_x, btn_y, btn_w, btn_h, TFT_BLACK);
-  std::string btn1_label = "按页码";
-  buildFontCache(btn1_label);
-  txt_w = getStringWidth(btn1_label);
-  drawCachedString(btn1_label, btn1_x + (btn_w - txt_w) / 2, btn_y + (btn_h - font_size) / 2);
-
-  canvas.fillRect(btn2_x, btn_y, btn_w, btn_h, TFT_WHITE);
-  canvas.drawRect(btn2_x, btn_y, btn_w, btn_h, TFT_BLACK);
-  std::string btn2_label = "按百分比";
-  buildFontCache(btn2_label);
-  txt_w = getStringWidth(btn2_label);
-  drawCachedString(btn2_label, btn2_x + (btn_w - txt_w) / 2, btn_y + (btn_h - font_size) / 2);
-
-  canvas.pushSprite(&M5.Display, 0, 0);
+  return buf;
 }
 
 bool UIManager::jumpToPage(int page) {
-    int screen_w = canvas.width();
-    int screen_h = canvas.height();
-    return bookReader.jumpToPage(page, pageCache, screen_w - 2 * PADDING_X, screen_h - 2 * PADDING_Y);
+    if (!bookReader.isIndexComplete() && page >= bookReader.getTotalPages()) {
+        showPromptBox("加载中...");
+        bookReader.indexUntilPageCount(pageCache, page + 1);
+    }
+    const reader::book::TextArea area = textArea();
+    return bookReader.jumpToPage(page, pageCache, area.w, area.h);
 }
 
 bool UIManager::jumpToPercentage(float percentage) {
-    int screen_w = canvas.width();
-    int screen_h = canvas.height();
-    return bookReader.jumpToPercentage(percentage, pageCache, screen_w - 2 * PADDING_X, screen_h - 2 * PADDING_Y);
+    if (!bookReader.isIndexComplete()) {
+        showPromptBox("加载中...");
+        bookReader.finishIndex(pageCache);
+    }
+    const reader::book::TextArea area = textArea();
+    return bookReader.jumpToPercentage(percentage, pageCache, area.w, area.h);
 }
 
-void UIManager::drawCachedString(const std::string& text, int x, int y) {
-  int cursor_x = x;
-  int cursor_y = y;
-  
-  const uint8_t* p = reinterpret_cast<const uint8_t*>(text.c_str());
-  const uint8_t* end = p + text.size();
+void UIManager::applyReadingStyle() {
+  bookReader.setStyle(reader::book::ReadingStyle::FromSettings(settings_));
+}
 
-  while (p < end)
-  {
-    int bytes = 0;
-    uint32_t unicode = Utf8Utils::getNextCharUnicode(p, end, bytes);
-    
-    if (bytes > 0)
-    {
-      p += bytes;
-      if (unicode <= 0xFFFF && unicode > 0)
-      {
-        if (unicode == '\n') {
-          cursor_x = x;
-          cursor_y += pageCache.getFontSize() * bookReader.getLineSpacingFactor(); // Line height
-          continue;
-        }
-        if (unicode == '\r') {
-          continue;
-        }
-        
-        uint16_t u = static_cast<uint16_t>(unicode);
-        const CharGlyphInfo* info = pageCache.getCharGlyphInfo(u);
-        int char_w = info ? info->width : (u == ' ' ? pageCache.getFontSize() / 2 : pageCache.getFontSize());
-        
-        if (info) {
-          const uint8_t* bitmap = pageCache.getCharBitmap(u);
-          if (bitmap) {
-            void* canvasBuffer = canvas.getBuffer();
-            if (canvasBuffer) {
-              uint8_t* pDst = static_cast<uint8_t*>(canvasBuffer);
-              const uint8_t* pSrc = bitmap;
-              int canvasWidth = canvas.width();
-              int canvasHeight = canvas.height();
-              
-              for (int h = 0; h < info->bitmapH; ++h) {
-                int dst_y = cursor_y + info->y_offset + h;
-                int dst_x = cursor_x + info->x_offset;
-                
-                // Clipping
-                if (dst_y >= 0 && dst_y < canvasHeight) {
-                  int copyWidth = info->bitmapW;
-                  int src_offset = 0;
-                  
-                  if (dst_x < 0) {
-                    src_offset = -dst_x;
-                    copyWidth += dst_x;
-                    dst_x = 0;
-                  }
-                  if (dst_x + copyWidth > canvasWidth) {
-                    copyWidth = canvasWidth - dst_x;
-                  }
-                  
-                  if (copyWidth > 0) {
-                    memcpy(pDst + dst_y * canvasWidth + dst_x, 
-                           pSrc + h * info->bitmapW + src_offset, 
-                           copyWidth);
-                  }
-                }
-              }
-            }
-          }
-        }
-        cursor_x += char_w;
-      }
-    }
-    else
-    {
-      p++;
-    }
+reader::book::TextArea UIManager::textArea() const {
+  // The canvas may be rotated for another page; use the panel size turned
+  // to the reading direction.
+  const bool canvas_landscape = canvas.getRotation() & 1;
+  const int panel_w = canvas_landscape ? canvas.height() : canvas.width();
+  const int panel_h = canvas_landscape ? canvas.width() : canvas.height();
+  const bool landscape = static_cast<int>(bookReader.style().orientation) & 1;
+  return bookReader.style().Area(landscape ? panel_h : panel_w,
+                                 landscape ? panel_w : panel_h);
+}
+
+std::string UIManager::resolvedBodyFontPath() {
+  const std::string requested = settings_.body_font_path;
+  if (requested == body_font_requested_) return body_font_resolved_;
+  body_font_resolved_ = FontManager::resolveFontPath(requested);
+  if (body_font_resolved_ != "builtin" && body_font_resolved_ != requested) {
+    // The configured font is gone; remember the replacement.
+    settings_.body_font_path = body_font_resolved_;
+    settings_.Save();
+    applyReadingStyle();
   }
+  body_font_requested_ = settings_.body_font_path;
+  return body_font_resolved_;
 }
 
+std::vector<std::string> UIManager::fontCachesInUse() const {
+  // Open fonts may still differ from the settings until the next draw, and
+  // their caches may be half written, so both count.
+  std::vector<std::string> paths = {uiCache.fontCachePath(),
+                                    pageCache.fontCachePath()};
+  if (PageFontCache::IsTtfPath(getUiFontPath())) {
+    paths.push_back(
+        reader::fonts::FontCachePath(getUiFontPath(), kUiFontPixelSize));
+  }
+  if (isBodyFontScalable()) {
+    paths.push_back(reader::fonts::FontCachePath(settings_.body_font_path,
+                                                 settings_.body_font_size));
+  }
+  return paths;
+}
 
+void UIManager::setFontPath(const std::string& path) {
+  settings_.body_font_path = path;
+  applyReadingStyle();
+  pageCache.clear();
+  body_font_requested_.clear();
+  layout_dirty_ = true;
+}
 
+void UIManager::setUiFontPath(const std::string& path) {
+  settings_.ui_font_path = path;
+  painter_.set_font_path(getUiFontPath());
+  uiCache.clear();
+}
 
+void UIManager::setBodyFontSize(int size) {
+  settings_.body_font_size = reader::core::ClampBodyFontSize(size);
+  pageCache.setTtfPixelSize(settings_.body_font_size);
+  layout_dirty_ = true;
+}
 
-int UIManager::getStringWidth(const std::string& text) {
-    int width = 0;
-    const uint8_t* p = reinterpret_cast<const uint8_t*>(text.c_str());
-    const uint8_t* end = p + text.size();
-    while (p < end) {
-        int bytes = 0;
-        uint32_t unicode = Utf8Utils::getNextCharUnicode(p, end, bytes);
-        
-        if (bytes == 0) break;
-        const CharGlyphInfo* info = pageCache.getCharGlyphInfo(unicode);
-        width += info ? info->width : pageCache.getFontSize();
-        p += bytes;
-    }
-    return width;
+void UIManager::setLineSpacingFactor(float factor) {
+  settings_.line_spacing = reader::core::ClampLineSpacing(factor);
+  applyReadingStyle();
+  layout_dirty_ = true;
+}
+
+void UIManager::setMargin(int margin) {
+  settings_.margin = reader::core::ClampMargin(margin);
+  applyReadingStyle();
+  layout_dirty_ = true;
+}
+
+void UIManager::setParagraphIndent(bool on) {
+  settings_.paragraph_indent = on;
+  applyReadingStyle();
+  layout_dirty_ = true;
+}
+
+void UIManager::setLineUnderline(bool on) {
+  // Drawing only: page breaks stay the same.
+  settings_.line_underline = on;
+  applyReadingStyle();
+}
+
+void UIManager::setOrientation(reader::core::Orientation orientation) {
+  settings_.orientation = orientation;
+  applyReadingStyle();
+  updateCanvasRotation();
+  layout_dirty_ = true;
+}
+
+void UIManager::setFullRefreshPages(int pages) {
+  settings_.full_refresh_pages = reader::core::ClampFullRefreshPages(pages);
 }
 
 std::string UIManager::getLastReadBook() {
@@ -545,6 +392,7 @@ std::string UIManager::getLastReadBook() {
 }
 
 void UIManager::saveGlobalConfig(const std::string& book_path) {
+    PERF_SCOPE("UIManager::saveGlobalConfig");
     if (SD.exists("/configs/global.cfg")) {
         SD.remove("/configs/global.cfg");
     }
@@ -556,28 +404,9 @@ void UIManager::saveGlobalConfig(const std::string& book_path) {
 }
 
 void UIManager::showPromptBox(const std::string& text) {
-  buildFontCache(text);
-  
-  int font_size = pageCache.getFontSize();
-  int screen_w = canvas.width();
-  int screen_h = canvas.height();
-  
-  int text_w = getStringWidth(text);
-  int box_w = text_w + 40;
-  int box_h = font_size + 40;
-  int box_x = (screen_w - box_w) / 2;
-  int box_y = (screen_h - box_h) / 2;
-
-  canvas.fillRect(box_x, box_y, box_w, box_h, TFT_WHITE);
-  canvas.drawRect(box_x, box_y, box_w, box_h, TFT_BLACK);
-  
-  int text_x = box_x + (box_w - text_w) / 2;
-  int text_y = box_y + (box_h - font_size) / 2;
-  
-  drawCachedString(text, text_x, text_y);
-  
-  M5.Display.setEpdMode(lgfx::epd_mode_t::epd_fast);
-  canvas.pushSprite(&M5.Display, 0, 0);
+  PERF_SCOPE("UIManager::showPromptBox");
+  reader::ui::DrawPromptBox(painter_, text);
+  pushCanvas(lgfx::epd_mode_t::epd_fast);
 }
 
 void UIManager::saveCurrentBookConfig() {
@@ -604,10 +433,11 @@ bool UIManager::checkBootToReaderFlag() {
 }
 
 void UIManager::enterDeepSleep(bool from_reader) {
+  canvas.setRotation(reader::hal::SystemRotation(settings_.orientation));
   canvas.fillScreen(TFT_WHITE);
   
-  bool lock_enabled = bookReader.isLockScreenEnabled();
-  std::string lock_path = bookReader.getLockScreenPath();
+  bool lock_enabled = settings_.lock_screen_enabled;
+  std::string lock_path = settings_.lock_screen_path;
   bool drawn = false;
   
   if (lock_enabled && !lock_path.empty() && SD.exists(lock_path.c_str())) {
@@ -646,18 +476,41 @@ void UIManager::enterDeepSleep(bool from_reader) {
   }
   
   // 4. Push Sprite with high quality mode to clear ghosting
-  M5.Display.setEpdMode(lgfx::epd_mode_t::epd_quality);
-  canvas.pushSprite(&M5.Display, 0, 0);
+  pushCanvas(lgfx::epd_mode_t::epd_quality);
   
   // 5. Setup sleep hardware
   esp_sleep_enable_ext0_wakeup((gpio_num_t)38, 0);
+  // Close half-written font cache files; the build restarts after wakeup.
+  pageCache.cancelFontCacheBuild();
+  uiCache.cancelFontCacheBuild();
   setBootToReaderFlag(from_reader);
   if (from_reader) {
       saveCurrentBookConfig();
   }
   
   delay(500);
-  M5.Power.deepSleep(0, false);
+  // Sleep through ESP-IDF directly instead of M5.Power.deepSleep(): that call
+  // also sends the IT8951 its SLEEP command, so a wakeup would find the panel
+  // in a different state than a reset-button reboot does. E-ink keeps the
+  // image without it.
+  M5.Display.waitDisplay();
+  constexpr gpio_num_t kWheelPushPin = GPIO_NUM_38;
+  while (digitalRead(kWheelPushPin) == LOW) {
+    delay(10);  // A held wheel would retrigger the ext0 wakeup at once.
+  }
+  esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
+  log_i("[sleep] deep sleep, wakeup on GPIO%d low", (int)kWheelPushPin);
+  esp_deep_sleep_start();
+}
+
+void UIManager::updateCanvasRotation() {
+  // Rotating the canvas only changes how later drawing is mapped; the
+  // pixels already in it stay, so a portrait page can open over a
+  // landscape one without redrawing it.
+  const bool rotated = currentPage && currentPage->followsReadingDirection();
+  canvas.setRotation(rotated
+                         ? static_cast<uint8_t>(settings_.orientation)
+                         : reader::hal::SystemRotation(settings_.orientation));
 }
 
 void UIManager::setPage(Page* page) {
@@ -665,33 +518,64 @@ void UIManager::setPage(Page* page) {
     currentPage->exit();
   }
   currentPage = page;
+  updateCanvasRotation();
   if (currentPage) {
     currentPage->enter();
   }
 }
 
-void UIManager::drawCurrentPage() {
-  if (currentPage) {
-    currentPage->draw(canvas);
-    
-    if (checkUiFullRefresh()) {
-      M5.Display.setEpdMode(lgfx::epd_mode_t::epd_quality);
-      Serial.println("UI full refresh triggered.");
-    } else {
-      M5.Display.setEpdMode(lgfx::epd_mode_t::epd_text);
-    }
-    
-    canvas.pushSprite(&M5.Display, 0, 0);
+void UIManager::mapInputToPage(SystemMessage_t* msg) const {
+  if (msg->type == MessageType::TOUCH) {
+    int x = msg->data.touch.x;
+    int y = msg->data.touch.y;
+    reader::hal::PanelToCanvas(canvas.getRotation(), M5.Display.width(),
+                               M5.Display.height(), &x, &y);
+    msg->data.touch.x = x;
+    msg->data.touch.y = y;
+  } else if (msg->type == MessageType::WHEEL) {
+    msg->data.wheel.delta = reader::hal::WheelToPageStep(
+        msg->data.wheel.delta, canvas.getRotation());
   }
 }
 
+void UIManager::drawCurrentPage() {
+  PERF_SCOPE("UIManager::drawCurrentPage");
+  if (currentPage) currentPage->show();
+}
+
+void UIManager::pushUiFrame() {
+  if (ui_refresh_.CountFrame(kUiFullRefreshFrames)) {
+    Serial.println("UI full refresh triggered.");
+    pushCanvas(lgfx::epd_mode_t::epd_quality);
+  } else {
+    pushCanvas(lgfx::epd_mode_t::epd_text);
+  }
+}
+
+void UIManager::pushCanvas(lgfx::epd_mode_t mode) {
+  reader::hal::PushFrame(canvas, mode);
+}
+
 void UIManager::setPageByState(State state) {
+  PERF_SCOPE("UIManager::setPageByState");
   switch (state) {
     case State::BOOKSHELF:
       setPage(&bookshelfPage);
       break;
     case State::SETTING:
-      setPage(&settingPage);
+      setPage(&systemSettingsPage);
+      break;
+    case State::READING_SETTINGS:
+      setPage(&readingSettingsPage);
+      break;
+    case State::READER:
+      setPage(&readerPage);
+      break;
+    case State::READER_MENU:
+      setPage(&readerMenuPage);
+      break;
+    case State::READER_JUMP_MENU:
+      setPage(&jumpPage);
       break;
     case State::TRANSFER:
       setPage(&transferPage);
@@ -708,62 +592,15 @@ void UIManager::setPageByState(State state) {
   }
 }
 
-void UIManager::drawBottomBar(const std::vector<std::string>& items, int selected_idx) {
-  int font_size = pageCache.getFontSize();
-  int screen_w = canvas.width();
-  int screen_h = canvas.height();
-  int bottom_bar_h = getFooterHeight();
-  int thick_line_y = screen_h - bottom_bar_h;
-  
-  canvas.fillRect(0, thick_line_y, screen_w, 4, TFT_BLACK);
-  
-  int bar_h = bottom_bar_h;
-  int text_y = thick_line_y + (bar_h - font_size) / 2;
-  int num_items = items.size();
-  if (num_items == 0) return;
-  
-  int col_w = screen_w / num_items;
-  
-  for (int i = 0; i < num_items; ++i) {
-    int txt_w = getStringWidth(items[i]);
-    drawCachedString(items[i], i * col_w + col_w / 2 - txt_w / 2, text_y);
-    
-    if (i > 0) {
-      canvas.drawLine(i * col_w, thick_line_y, i * col_w, screen_h, TFT_BLACK);
-    }
-  }
+void UIManager::drawHeader(const std::string& title) {
+  reader::ui::DrawHeader(painter_, title, getHeaderHeight(),
+                         M5.Power.getBatteryLevel());
 }
 
-void UIManager::drawBattery(LGFX_Sprite& canvas, int right_x, int y) {
-  int battery = M5.Power.getBatteryLevel();
-  char batt_str[16];
-  snprintf(batt_str, sizeof(batt_str), "%d%%", battery);
-  
-  int font_size = pageCache.getFontSize();
-  buildFontCache(batt_str);
-  int batt_txt_w = getStringWidth(batt_str);
-  
-  int icon_h = font_size * 0.75;
-  int icon_w = icon_h * 2.1;
-  int cap_h = icon_h * 0.4;
-  int cap_w = icon_h * 0.15;
-  
-  int total_w = batt_txt_w + 10 + icon_w + cap_w;
-  int start_x = right_x - total_w;
-  
-  drawCachedString(batt_str, start_x, y);
-  
-  int icon_x = start_x + batt_txt_w + 10;
-  int icon_y = y + (font_size - icon_h) / 2;
-  
-  canvas.drawRect(icon_x, icon_y, icon_w, icon_h, TFT_BLACK);
-  canvas.fillRect(icon_x + icon_w, icon_y + (icon_h - cap_h) / 2, cap_w, cap_h, TFT_BLACK);
-  
-  int inner_w = icon_w - 4;
-  int inner_h = icon_h - 4;
-  int fill_w = (battery * inner_w) / 100;
-  
-  if (fill_w > 0) {
-      canvas.fillRect(icon_x + 2, icon_y + 2, fill_w, inner_h, TFT_BLACK);
-  }
+void UIManager::drawBottomBar(const std::vector<std::string>& items) {
+  reader::ui::DrawBottomBar(painter_, items, getFooterHeight());
+}
+
+void UIManager::drawBattery(int right_x, int y) {
+  reader::ui::DrawBattery(painter_, right_x, y, M5.Power.getBatteryLevel());
 }

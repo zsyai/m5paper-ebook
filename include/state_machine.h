@@ -6,14 +6,13 @@
 #include <freertos/queue.h>
 
 enum class State {
-    HOME,
     BOOKSHELF,
     READER,
     READER_MENU,
     READER_JUMP_MENU,
     TRANSFER,
-    SETTING,
-    CONTINUE,
+    SETTING,            // 系统设置
+    READING_SETTINGS,   // 阅读设置
     USER_GUIDE,
     IMAGE_PICKER,
     SLEEP
@@ -51,6 +50,7 @@ extern QueueHandle_t g_state_machine_queue;
 
 void init_state_machine();
 void set_current_state(State state);
+State get_current_state();
 void state_machine_task(void *pvParameters);
 bool send_message(const SystemMessage_t& msg);
 

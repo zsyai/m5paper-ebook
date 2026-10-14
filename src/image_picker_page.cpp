@@ -212,7 +212,7 @@ void ImagePickerPage::draw(LGFX_Sprite& canvas) {
         canvas.drawLine(col_w, 0, col_w, bar_h, TFT_BLACK);
         
         // Top Right: Battery
-        ui.drawBattery(canvas, screen_w - 20, (bar_h - ui.getFontSize()) / 2);
+        ui.drawBattery(screen_w - 20, (bar_h - ui.getFontSize()) / 2);
         
         // Draw Bottom Bar only if there are images
         if (!image_files.empty()) {

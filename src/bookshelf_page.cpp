@@ -1,5 +1,6 @@
 #include "bookshelf_page.h"
 #include "ui_manager.h"
+#include "core/perf_trace.h"
 
 #include <M5Unified.h>
 #include <SD.h>
@@ -17,10 +18,17 @@ void BookshelfPage::exit() {
 }
 
 void BookshelfPage::draw(LGFX_Sprite& canvas) {
+  PERF_SCOPE("BookshelfPage::draw");
   const std::vector<BookInfo>& books = bookshelf.getBookList();
 
   // 1. Build Cache
   std::string all_text = "我的书架剩余电量已读完未读上次阅读上一页下一页滚轮下滑显示下一页";
+  if (!ui.hasTFCard()) {
+    all_text += "未检测到TF卡";
+  } else {
+    all_text += "未找到书籍。";
+  }
+  all_text += "字体文件缺失，正在使用内置字体请通过“传书”上传字体文件";
   all_text += "传书设置休眠·%0123456789.MBKB |";
   for (const auto& book : books) {
     all_text += book.filename.c_str();
@@ -39,7 +47,7 @@ void BookshelfPage::draw(LGFX_Sprite& canvas) {
   
   ui.drawCachedString("我的书架", 20, text_y);
   
-  ui.drawBattery(canvas, canvas.width() - 20, text_y);
+  ui.drawBattery(canvas.width() - 20, text_y);
   
   // Draw header separator line
   int line_y = bar_h - 4;
@@ -132,8 +140,8 @@ void BookshelfPage::draw(LGFX_Sprite& canvas) {
     canvas.drawFastHLine(0, item_y - 5, screen_w, TFT_BLACK);
   }
   
-  if (books.empty()) {
-    ui.drawCachedString("未找到书籍。", 20, item_y);
+  if (ui.hasTFCard() && books.empty()) {
+    ui.drawCachedString("未找到书籍。", 20, item_y + 20);
   }
   
   // 4. Draw Bottom
@@ -169,10 +177,29 @@ void BookshelfPage::draw(LGFX_Sprite& canvas) {
   canvas.drawLine(col_w, thick_line_y, col_w, screen_h, TFT_BLACK);
   canvas.drawLine(2 * col_w, thick_line_y, 2 * col_w, screen_h, TFT_BLACK);
 
-  if (ui.isUsingBuiltinFont()) {
+  if (!ui.hasTFCard()) {
+    std::string line1 = "未检测到TF卡";
+
+    int font_size = ui.getFontSize();
+    int screen_w = canvas.width();
+    int screen_h = canvas.height();
+
+    int w1 = ui.getStringWidth(line1);
+    int box_w = w1 + 40;
+    int box_h = font_size + 40;  // 1 line + padding
+    int box_x = (screen_w - box_w) / 2;
+    int box_y = (screen_h - box_h) / 2;
+
+    canvas.fillRect(box_x, box_y, box_w, box_h, TFT_WHITE);
+    canvas.drawRect(box_x, box_y, box_w, box_h, TFT_BLACK);
+
+    int text_x1 = box_x + (box_w - w1) / 2;
+    int text_y1 = box_y + 20;
+
+    ui.drawCachedString(line1, text_x1, text_y1);
+  } else if (ui.isUsingBuiltinFont()) {
     std::string line1 = "字体文件缺失，正在使用内置字体";
     std::string line2 = "请通过“传书”上传字体文件";
-    ui.buildFontCache(line1 + line2);
 
     int font_size = ui.getFontSize();
     int screen_w = canvas.width();

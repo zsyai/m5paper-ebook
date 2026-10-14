@@ -195,7 +195,7 @@ void TransferPage::draw(LGFX_Sprite& canvas) {
   ui.drawCachedString("WiFi 传书", 20, text_y);
   
   // Draw battery
-  ui.drawBattery(canvas, canvas.width() - 20, text_y);
+  ui.drawBattery(canvas.width() - 20, text_y);
   
   int line_y = bar_h - 4;
   canvas.fillRect(0, line_y, screen_w, 4, TFT_BLACK);

@@ -1,4 +1,5 @@
 #include "bookshelf.h"
+#include "core/perf_trace.h"
 
 #include <SD.h>
 
@@ -7,6 +8,7 @@ void Bookshelf::init() {
 }
 
 void Bookshelf::refresh() {
+  PERF_SCOPE("Bookshelf::refresh");
   bookList.clear();
   
   String last_read_filename = "";

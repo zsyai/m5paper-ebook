@@ -17,33 +17,32 @@
 ## 功能特性
 
 *   **高对比度墨水屏界面**：包含电池图标、触控区域与局部刷新支持。
-*   **中文文本支持**：
-    *   支持 **UTF-8** 与 **GBK** 编码格式（自动转换）。
-    *   实现针对中文排版与标点符号的换行处理。
-*   **自定义字体系统**：
-    *   支持解析由 `.ttf` 字体文件生成的自定义二进制字体格式（`.bin`）。
-    *   **双字体渲染模式**：
-        *   *流畅型 (Fluency)*：体积小，有锯齿。
-        *   *清晰型 (Clarity)*：边缘抗锯齿处理，体积稍大。
-    *   **字形缓存**：在 PSRAM 中缓存已加载的字形以降低翻页延迟。
-    *   **内置 NotoSansSC 备用**：若外部 SD 卡字体文件缺失，系统退回到内置集成的 30px NotoSansSC 字体。
-*   **阅读参数调节**：
-    *   字号大小支持在 16px 到 40px 之间调整。
-    *   行距支持 1.5 倍与 2.0 倍调节，并在小字号下调整了触控判定区域。
-*   **分页与书签**：
-    *   后台分页索引：将分页数据持久化为 SD 卡上的 `.idx` 文件以实现跳转。
-    *   每本书均支持独立的书签添加与管理。
+*   **多编码中文文本支持**：
+    *   支持 **UTF-8**、**GBK / GB18030** 与 **UTF-16 (LE/BE)** 编码格式自动识别与转换。
+    *   实现针对中文排版与行首禁则标点的换行处理。
+*   **自定义字体系统（直读 `.ttf` + `.bin` 字体包）**：
+    *   支持直接将 `.ttf` 字体放入 `/fonts` 目录由 FreeType 实时渲染，并在后台自动将常用字形缓存为 SD 卡 `/configs/fontcache/` 下的 `.bin` 缓存文件，兼顾任意字号缩放与翻页速度。
+    *   同时支持网页端或脚本预转换生成的自定义二进制字体（`.bin`）。
+    *   **界面字体与正文字体分离**：界面字体固定 30px（内置或 `.ttf`），正文字体独立选择。
+    *   **内置 NotoSansSC 备用**：若外部 SD 卡字体文件缺失，系统自动退回内置 30px 字体。
+*   **丰富的阅读排版与方向设置（带实时预览）**：
+    *   **正文字号**：`.ttf` 字体支持 **20px–60px**（步进 2，支持步进器与数字键盘直接输入）。
+    *   **行间距**：支持 **1.0 / 1.5 / 2.0 / 2.5 / 3.0** 五档调节。
+    *   **页边距**：支持 **0–80px** 预设档位切换与数字键盘自定义输入。
+    *   **段首缩进与行下虚线**：支持一键开启统一两字符段首缩进与行下辅助虚线。
+    *   **四向阅读（`↓` / `←` / `↑` / `→`）**：支持竖屏、左右横屏及竖屏倒置四个方向，触控与滚轮方向自动跟随。
+    *   **全刷间隔**：支持 **1–99 页** 自定义全局刷新间隔。
+*   **后台增量分页与精准跳转**：
+    *   打开书籍即刻渲染首屏，后台增量建立二进制分页索引（`.idx`）。
+    *   支持按页码或按百分比数字键盘精准跳转，顶部实时显示当前页码、总页数与进度。
 *   **Wi-Fi 无线传书与传字体 (Web UI)**：
-    *   在书架页开启局域网热点，使用手机或电脑浏览器上传 `.txt` 电子书和 `.bin` 字体文件。
-    *   网页端支持在上传前预览字体的实际渲染样式。
+    *   在书架页开启局域网热点，使用手机或电脑浏览器上传 `.txt` 电子书、`.ttf` 或 `.bin` 字体文件及锁屏图片。
 *   **电源与存储管理**：
-    *   选择 SD 卡中的图片作为待机壁纸。
-    *   深度睡眠支持（支持开机直达阅读界面）。
-    *   清理阅读记录与缓存文件。
+    *   选择 SD 卡中的图片作为待机锁屏壁纸。
+    *   深度睡眠支持（支持开机直达阅读界面，长按滚轮键唤醒）。
+    *   一键清理已删除书籍的过期阅读记录，以及清理未使用的 TTF 字形缓存文件。
 
 ## 实物效果与截图
-
-*以下为计划添加的实物图与界面展示占位符。未来可直接将对应图片文件放入 `docs/images/` 下即可自动加载：*
 
 | 书架界面展示 | 阅读界面展示 | 设置页面展示 |
 | :---: | :---: | :---: |
@@ -64,20 +63,24 @@
 *   **唤出菜单**：点击屏幕中央 1/3 区域。
 
 ### 阅读菜单
-*   **“返回”**：点击返回书架。
-*   **“跳转”**：点击可输入页码或百分比进行精准跳转。
-*   **关闭菜单**：点击屏幕中央的任意空白区域即可关闭菜单。
+*   **“返回”**：点击左上角返回书架。
+*   **进度与跳转**：点击底部第一行阅读进度栏，弹出数字键盘，支持按页码或按百分比跳转。
+*   **“阅读设置”**：点击底部左下角直接进入阅读设置页（带实时正文预览），修改后返回立即生效。
+*   **关闭菜单**：点击屏幕中央空白区域或按压滚轮键即可关闭菜单。
 
 ### 休眠与唤醒
-*   **低功耗深度休眠**：在阅读菜单中点击底部右侧的 **休眠** 按钮可使设备立即进入深度休眠状态。
+*   **低功耗深度休眠**：在书架、系统设置或阅读菜单底部点击 **休眠** 按钮可使设备立即进入深度休眠状态。
 *   **设备唤醒**：向内长按物理滚轮键 **3 秒** 可唤醒设备。
 
-### 书架页与其他通用操作
+### 书架页与系统设置
 *   **书架**：显示 SD 卡 `/books` 目录下的书籍。点击书籍卡片即可开始阅读，最近一次阅读的书籍会自动排在书架首位。
-*   **传书**：点击底部状态栏的 **传书** 按钮启动局域网热点，通过电脑或手机连接并访问屏幕提示的 IP 地址上传电子书。
-*   **设置**：点击底部状态栏的 **设置** 按钮：
-    *   *行间距*：支持在 1.5 倍与 2.0 倍之间切换（切换后会自动重新计算分页）。
-    *   *清理过期阅读记录*：若手动删除了 `/books` 下的书籍，可在此一键清理对应的历史配置（.cfg）与分页索引（.idx）文件以释放空间。
+*   **传书**：点击底部状态栏的 **传书** 按钮启动局域网热点，通过电脑或手机连接并访问屏幕提示的 IP 地址上传电子书与字体。
+*   **系统设置**：点击书架底部状态栏的 **设置** 按钮进入系统设置：
+    *   *阅读设置*：进入阅读排版设置（正文字体、20–60px 字号、1.0–3.0 行间距、0–80px 页边距、段首缩进、行下虚线、四向阅读方向、全刷间隔）。
+    *   *界面字体*：切换系统 UI 字体（内置字体或 `/fonts` 下的 `.ttf` 字体）。
+    *   *锁屏壁纸*：开关自定义锁屏壁纸并从 `/images` 选择图片。
+    *   *过期阅读记录*：一键清理已删除书籍遗留的 `.cfg` 与 `.idx` 文件。
+    *   *字体缓存*：查看 `/configs/fontcache/` 占用空间，一键清理当前未使用的 TTF 字形缓存。
 
 ## 快速上手
 
@@ -151,34 +154,33 @@ This project provides a Chinese reading implementation on the e-paper screen, fe
 
 ## Features
 
-*   **E-paper Interface**: High-contrast E-paper interface with a battery indicator, touch targets, and partial refresh support.
-*   **Chinese Text Support**:
-    *   Support for **UTF-8** and **GBK** encodings (automatic conversion).
-    *   Word wrapping and punctuation handling for Chinese characters.
-*   **Custom Font Subsystem**:
-    *   Renders custom binary font formats generated from `.ttf`.
-    *   **Dual-Font Support**: Includes two preset rendering styles (configurable via the Web UI):
-        *   *Fluency*: Smaller file size, faster loading, slightly aliased.
-        *   *Clarity*: Antialiased, smooth curves, larger file size.
-    *   **Font Caching**: Caches character glyphs in PSRAM to reduce page-turn latency.
-    *   **NotoSansSC Fallback**: Falls back to the built-in NotoSansSC font if the external font file is missing.
-*   **Reading Settings**:
-    *   Adjustable font sizes (ranging from 16px to 40px).
-    *   Adjustable line spacing (1.5x and 2.0x).
-*   **Pagination & Bookmarks**:
-    *   Background pagination indexing with cache saved as `.idx` files on the SD card.
-    *   Add and manage bookmarks per book.
+*   **E-paper Interface**: High-contrast E-paper interface with a battery indicator, touch targets, and configurable full-refresh intervals.
+*   **Multi-Encoding Chinese Text Support**:
+    *   Automatic detection and conversion for **UTF-8**, **GBK / GB18030**, and **UTF-16 (LE/BE)** text files.
+    *   Word wrapping and line-start punctuation rules (kinsoku) for Chinese typography.
+*   **Custom Font Subsystem (Direct `.ttf` + `.bin` Packs)**:
+    *   Directly renders `.ttf` fonts from `/fonts` via FreeType and automatically builds pre-rendered `.bin` glyph caches in `/configs/fontcache/` in the background.
+    *   Also supports pre-converted `.bin` font packs generated via the Web UI or Python script.
+    *   **Separate UI & Body Fonts**: Fixed 30px UI font (built-in or `.ttf`) independent from the scalable body font.
+    *   **Built-in Fallback**: Automatically falls back to the embedded 30px NotoSansSC font if the external font file is missing.
+*   **Reading Layout & Orientation Settings (with Live Preview)**:
+    *   **Body Font Size**: Adjustable from **20px to 60px** (step 2, stepper buttons or numeric keypad input) for `.ttf` fonts.
+    *   **Line Spacing**: 5 levels (**1.0x / 1.5x / 2.0x / 2.5x / 3.0x**).
+    *   **Page Margins**: Adjustable from **0px to 80px** via presets or numeric keypad input.
+    *   **Paragraph Indent & Line Guides**: Optional uniform 2-character paragraph indentation and dashed under-line reading guides.
+    *   **4-Direction Reading (`↓` / `←` / `↑` / `→`)**: Portrait, left/right landscape, and inverted portrait orientations with automatic touch and wheel mapping.
+    *   **Full-Refresh Interval**: Configurable from **1 to 99 pages**.
+*   **Incremental Background Pagination & Jump**:
+    *   Opens books immediately and builds binary `.idx` page indexes incrementally in the background.
+    *   Jump by page number or percentage via a numeric keypad displaying current page, total pages, and progress.
 *   **Wi-Fi File Transfer (Web UI)**:
-    *   Runs a local Web Server on M5Paper to upload `.txt` books and `.bin` fonts directly from your phone or computer.
-    *   Select and preview font rendering styles ("Fluency" vs. "Clarity") right in the web browser before uploading.
+    *   Runs a local Web Server on M5Paper to upload `.txt` books, `.ttf`/`.bin` fonts, and lock-screen images directly from your phone or computer.
 *   **Power & Storage Management**:
     *   Wallpaper selection from images on the SD card.
-    *   Deep sleep integration (with optional boot-straight-to-reading feature).
-    *   Clearing reading records and cache.
+    *   Deep sleep integration (with boot-to-reader support).
+    *   One-click cleanup for obsolete reading records and unused TTF font caches.
 
 ## Demos & Physical Screenshots
-
-*Below are placeholders for the planned physical photos showcasing the device and software. You can place corresponding images in `docs/images/` in the future to enable them:*
 
 | Bookshelf Interface | Reading Interface | Settings Page |
 | :---: | :---: | :---: |
@@ -199,20 +201,24 @@ The reader is operated via the touchscreen and the physical wheel button.
 *   **Open Reading Menu**: Tap the center 1/3 area of the screen.
 
 ### Reading Menu
-*   **Return**: Tap the button in the top-left corner to return to the Bookshelf.
-*   **Jump**: Tap the button in the bottom-left corner to input a page number or percentage for precise jumping.
-*   **Close Menu**: Tap any blank area in the middle of the screen to close the menu.
+*   **Return**: Tap the top-left button to return to the Bookshelf.
+*   **Progress & Jump**: Tap the progress row at the top of the bottom bar to open the numeric keypad and jump by page number or percentage.
+*   **Reading Settings**: Tap the bottom-left button to open Reading Settings (with live preview).
+*   **Close Menu**: Tap any blank area in the middle of the screen or press the wheel button to close the menu.
 
 ### Sleep & Wake
-*   **Low-Power Sleep**: Tap the **Sleep** button in the bottom-right corner of the reading menu to enter deep sleep immediately.
+*   **Low-Power Sleep**: Tap the **Sleep** button in the bottom bar to enter deep sleep immediately.
 *   **Wake Up Device**: Press and hold the physical wheel button inward for **3 seconds** to wake up.
 
-### Bookshelf Page
+### Bookshelf & System Settings
 *   **Book Selection**: Tap a book card to start reading. The most recently read book is automatically pinned to the top of the shelf.
 *   **Wi-Fi Transfer**: Tap **Transfer** in the bottom navigation bar to start a local hotspot, then connect via phone/computer and visit the displayed IP address to upload books/fonts.
-*   **Settings Page**: Tap **Settings** in the bottom navigation bar:
-    *   *Line Spacing*: Switch between 1.5x and 2.0x (automatically re-paginates).
-    *   *Clear Obsolete Progress*: One-click clearing of configurations (.cfg) and pagination indexes (.idx) for manually deleted books to free space.
+*   **System Settings**: Tap **Settings** in the bookshelf bottom bar:
+    *   *Reading Settings*: Configure body font, font size (20–60px), line spacing (1.0–3.0x), page margins (0–80px), paragraph indent, line guides, 4-way reading orientation, and full-refresh interval.
+    *   *UI Font*: Switch the 30px UI font between the built-in font and `.ttf` fonts in `/fonts`.
+    *   *Lock Screen Wallpaper*: Enable/disable and pick a lock screen image from `/images`.
+    *   *Clear Obsolete Progress*: Remove `.cfg` and `.idx` files for deleted books.
+    *   *Font Cache*: View total size in `/configs/fontcache/` and clean up unused TTF glyph caches.
 
 ## Getting Started
 
