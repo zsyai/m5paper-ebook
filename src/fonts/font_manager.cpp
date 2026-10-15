@@ -1,4 +1,4 @@
-#include "font_manager.h"
+#include "fonts/font_manager.h"
 #include "core/perf_trace.h"
 #include <SD.h>
 #include <algorithm>

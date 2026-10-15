@@ -1,6 +1,6 @@
 #include "book/text_decode.h"
 
-#include "gbk_unicode_table.h"
+#include "book/gbk_unicode_table.h"
 
 namespace reader {
 namespace book {

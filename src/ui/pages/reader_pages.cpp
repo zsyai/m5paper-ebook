@@ -5,7 +5,7 @@
 
 #include "ui/text_renderer.h"
 #include "ui/widgets/controls.h"
-#include "ui_manager.h"
+#include "app/ui_manager.h"
 
 extern UIManager ui;
 

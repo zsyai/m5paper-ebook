@@ -1,6 +1,6 @@
-#include "page.h"
+#include "ui/page.h"
 
-#include "ui_manager.h"
+#include "app/ui_manager.h"
 
 extern UIManager ui;
 

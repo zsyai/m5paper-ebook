@@ -7,7 +7,7 @@
 #include "book/page_indexer.h"
 #include "book/reading_style.h"
 #include "book/text_decode.h"
-#include "font_buffer.h"
+#include "fonts/font_buffer.h"
 
 class BookReader {
  public:

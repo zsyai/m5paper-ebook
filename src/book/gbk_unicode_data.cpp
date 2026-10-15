@@ -3,7 +3,7 @@
 // 生成时间: 2025-09-15 14:26:38.322445
 // 表大小: 完整GBK字符集映射
 
-#include "gbk_unicode_table.h"
+#include "book/gbk_unicode_table.h"
 #include <Arduino.h>
 
 // 完整的GBK到Unicode映射表（存储在Flash PROGMEM中）

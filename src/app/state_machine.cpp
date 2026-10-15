@@ -1,6 +1,6 @@
-#include "state_machine.h"
+#include "app/state_machine.h"
 #include <M5Unified.h>
-#include "ui_manager.h"
+#include "app/ui_manager.h"
 
 QueueHandle_t g_state_machine_queue = NULL;
 static State s_current_state = State::BOOKSHELF;

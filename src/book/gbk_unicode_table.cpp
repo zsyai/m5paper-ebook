@@ -1,4 +1,4 @@
-#include "gbk_unicode_table.h"
+#include "book/gbk_unicode_table.h"
 #include <Arduino.h>
 
 // 查找表数据在 gbk_unicode_data.cpp 中定义

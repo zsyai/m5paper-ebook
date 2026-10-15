@@ -7,8 +7,8 @@
 
 #include "core/perf_trace.h"
 #include "core/settings.h"
-#include "font_manager.h"
-#include "ui_manager.h"
+#include "fonts/font_manager.h"
+#include "app/ui_manager.h"
 
 extern UIManager ui;
 

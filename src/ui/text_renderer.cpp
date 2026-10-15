@@ -4,7 +4,7 @@
 #include <cstring>
 
 #include "ui/canvas_pixels.h"
-#include "utf8_utils.h"
+#include "book/utf8_utils.h"
 
 namespace reader {
 namespace ui {

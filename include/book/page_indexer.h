@@ -13,7 +13,7 @@
 
 #include "book/page_layout.h"
 #include "book/text_decode.h"
-#include "font_buffer.h"
+#include "fonts/font_buffer.h"
 
 namespace reader {
 namespace book {

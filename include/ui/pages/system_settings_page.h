@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "fonts/font_cache_store.h"
-#include "page.h"
+#include "ui/page.h"
 #include "ui/rect.h"
 #include "ui/widgets/dialog.h"
 #include "ui/widgets/setting_rows.h"

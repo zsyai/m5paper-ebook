@@ -4,10 +4,11 @@
 
 #include "book/reading_records.h"
 #include "core/perf_trace.h"
-#include "font_manager.h"
+#include "fonts/font_manager.h"
 #include "ui/text_renderer.h"
+#include "ui/widgets/bars.h"
 #include "ui/widgets/controls.h"
-#include "ui_manager.h"
+#include "app/ui_manager.h"
 
 extern UIManager ui;
 
@@ -161,10 +162,11 @@ State SystemSettingsPage::handleEvent(const SystemMessage_t& msg) {
     return State::SETTING;
   }
 
-  if (y >= M5.Display.height() - ::ui.getFooterHeight()) {
-    const int col = x / (M5.Display.width() / 3);
-    if (col == 0) return State::TRANSFER;
-    if (col == 1) return State::BOOKSHELF;
+  const int footer_col = BottomBarHit(::ui.getCanvas(), ::ui.getFooterHeight(),
+                                      /*count=*/3, x, y);
+  if (footer_col == 0) return State::TRANSFER;
+  if (footer_col == 1) return State::BOOKSHELF;
+  if (footer_col == 2) {
     ::ui.enterDeepSleep(/*from_reader=*/false);
     return State::SETTING;
   }

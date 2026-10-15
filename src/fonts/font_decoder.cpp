@@ -1,4 +1,4 @@
-#include "font_decoder.h"
+#include "fonts/font_decoder.h"
 
 void FontDecoder::decode_bitmap_1bit(const uint8_t* raw_data, uint32_t bitmap_size, 
                                      uint8_t* output_bitmap, int16_t w, int16_t h) {

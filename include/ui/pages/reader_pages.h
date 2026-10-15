@@ -4,7 +4,7 @@
 // it, and the jump keypad drawn over the menu. They replace the special
 // cases that used to live in state_machine.cpp.
 
-#include "page.h"
+#include "ui/page.h"
 #include "ui/rect.h"
 #include "ui/widgets/keypad.h"
 

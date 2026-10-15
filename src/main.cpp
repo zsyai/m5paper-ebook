@@ -2,8 +2,8 @@
 #include <SD.h>
 #include <SPI.h>
 
-#include "ui_manager.h"
-#include "state_machine.h"
+#include "app/ui_manager.h"
+#include "app/state_machine.h"
 #include "core/perf_trace.h"
 #include "core/sd_bench.h"
 

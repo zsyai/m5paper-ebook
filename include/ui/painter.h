@@ -6,7 +6,7 @@
 
 #include <string>
 
-#include "font_buffer.h"
+#include "fonts/font_buffer.h"
 #include "ui/rect.h"
 
 namespace reader {

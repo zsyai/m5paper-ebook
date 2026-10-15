@@ -7,7 +7,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(script_dir)
 
 html_path = os.path.join(project_root, "assets", "transfer_client.html")
-header_path = os.path.join(project_root, "include", "transfer_client_html.h")
+header_path = os.path.join(project_root, "include", "ui", "pages", "transfer_client_html.h")
 
 def convert():
     if not os.path.exists(html_path):

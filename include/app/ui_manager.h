@@ -1,22 +1,25 @@
 #ifndef EXPERIMENTAL_USERS_ZHENGSHUYU_READER_INCLUDE_UI_MANAGER_H_
 #define EXPERIMENTAL_USERS_ZHENGSHUYU_READER_INCLUDE_UI_MANAGER_H_
 
-#include "bookshelf.h"
-#include "transfer_page.h"
-#include "user_guide_page.h"
-#include "font_buffer.h"
+#include "book/bookshelf.h"
+#include "fonts/font_buffer.h"
 #include <M5GFX.h>
 #include <atomic>
 #include <SD.h>
-#include "book_reader.h"
+#include "book/book_reader.h"
 #include "book/reading_style.h"
 #include "core/settings.h"
-#include "font_manager.h"
+#include "fonts/font_manager.h"
 #include "hal/display.h"
+#include "ui/page.h"
 #include "ui/painter.h"
+#include "ui/pages/bookshelf_page.h"
+#include "ui/pages/image_picker_page.h"
 #include "ui/pages/reader_pages.h"
 #include "ui/pages/reading_settings_page.h"
 #include "ui/pages/system_settings_page.h"
+#include "ui/pages/transfer_page.h"
+#include "ui/pages/user_guide_page.h"
 #include "ui/rect.h"
 
 class MyFileDataWrapper : public lgfx::v1::DataWrapper {
@@ -29,9 +32,6 @@ class MyFileDataWrapper : public lgfx::v1::DataWrapper {
     void close(void) override { _file.close(); }
     int32_t tell(void) override { return _file.position(); }
 };
-#include "page.h"
-#include "bookshelf_page.h"
-#include "image_picker_page.h"
 
 class UIManager {
  public:
@@ -202,11 +202,11 @@ class UIManager {
   reader::ui::ReaderPage readerPage;
   reader::ui::ReaderMenuPage readerMenuPage;
   reader::ui::JumpPage jumpPage;
-  BookshelfPage bookshelfPage;
+  reader::ui::BookshelfPage bookshelfPage;
   Page* currentPage = nullptr;
-  TransferPage transferPage;
-  UserGuidePage userGuidePage;
-  ImagePickerPage imagePickerPage;
+  reader::ui::TransferPage transferPage;
+  reader::ui::UserGuidePage userGuidePage;
+  reader::ui::ImagePickerPage imagePickerPage;
   // UI glyphs: the UI uses a few hundred distinct characters at 30px.
   PageFontCache uiCache{/*budget_bytes=*/512 * 1024};
   // Body glyphs: at least two pages of distinct characters, even at 60px.

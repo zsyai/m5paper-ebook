@@ -1,4 +1,4 @@
-#include "font_buffer.h"
+#include "fonts/font_buffer.h"
 
 #include <Arduino.h>
 #include <esp_heap_caps.h>
@@ -7,8 +7,8 @@
 #include <cstring>
 
 #include "core/perf_trace.h"
-#include "font_manager.h"
-#include "utf8_utils.h"
+#include "fonts/font_manager.h"
+#include "book/utf8_utils.h"
 
 // Built-in UI font: GB2312 + ASCII at 30px (assets/ui_font_30.bin, embedded
 // through board_build.embed_files in platformio.ini).

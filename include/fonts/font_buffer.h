@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "font_decoder.h"
+#include "fonts/font_decoder.h"
 #include "fonts/bin_glyph_source.h"
 #include "fonts/cached_ttf_glyph_source.h"
 #include "fonts/font_cache_builder.h"

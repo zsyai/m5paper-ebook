@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-#include "font_decoder.h"  // CharGlyphInfo
+#include "fonts/font_decoder.h"  // CharGlyphInfo
 
 namespace reader {
 namespace fonts {

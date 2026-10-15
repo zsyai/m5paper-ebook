@@ -1,7 +1,7 @@
 #pragma once
 
 #include <M5GFX.h>
-#include "state_machine.h"
+#include "app/state_machine.h"
 
 class Page {
  public:

@@ -11,7 +11,7 @@
 
 #include <string>
 
-#include "font_buffer.h"
+#include "fonts/font_buffer.h"
 
 namespace reader {
 namespace ui {
