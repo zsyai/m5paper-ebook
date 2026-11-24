@@ -37,5 +37,40 @@ int WheelToPageStep(int delta, int rotation) {
   return delta;
 }
 
+void PanelDeltaToCanvas(int rotation, int* dx, int* dy) {
+  const int px = *dx;
+  const int py = *dy;
+  // PanelToCanvas() without the translation.
+  switch (rotation & 3) {
+    case 1:
+      *dx = py;
+      *dy = -px;
+      break;
+    case 2:
+      *dx = -px;
+      *dy = -py;
+      break;
+    case 3:
+      *dx = -py;
+      *dy = px;
+      break;
+    default:
+      break;
+  }
+}
+
+Swipe ClassifySwipe(int dx, int dy) {
+  const int ax = dx < 0 ? -dx : dx;
+  const int ay = dy < 0 ? -dy : dy;
+  // The main axis must be clearly longer than the other one.
+  if (ax >= kMinSwipeDistance && ax * 2 >= ay * 3) {
+    return dx < 0 ? Swipe::kLeft : Swipe::kRight;
+  }
+  if (ay >= kMinSwipeDistance && ay * 2 >= ax * 3) {
+    return dy < 0 ? Swipe::kUp : Swipe::kDown;
+  }
+  return Swipe::kNone;
+}
+
 }  // namespace hal
 }  // namespace reader

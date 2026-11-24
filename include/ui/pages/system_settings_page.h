@@ -1,12 +1,14 @@
-#pragma once
+#ifndef EXPERIMENTAL_USERS_ZHENGSHUYU_READER_INCLUDE_UI_PAGES_SYSTEM_SETTINGS_PAGE_H_
+#define EXPERIMENTAL_USERS_ZHENGSHUYU_READER_INCLUDE_UI_PAGES_SYSTEM_SETTINGS_PAGE_H_
 
-// 系统设置, opened from the bookshelf: a row that opens 阅读设置, the UI
-// font, the lock screen wallpaper, cleaning old reading records and unused
-// font caches, and the user guide.
+// 系统设置, opened from the bookshelf: 阅读设置 entry, UI font, sleep mode,
+// lock-screen wallpaper, cleaning old reading records and unused font caches,
+// and the user guide.
 
 #include <string>
 #include <vector>
 
+#include "book/reading_records.h"
 #include "fonts/font_cache_store.h"
 #include "ui/page.h"
 #include "ui/rect.h"
@@ -18,28 +20,25 @@ namespace ui {
 
 class SystemSettingsPage : public Page {
  public:
-  void enter() override;
-  void exit() override { dialog_.Close(); }
-  void draw(LGFX_Sprite& canvas) override;
-  State handleEvent(const SystemMessage_t& msg) override;
+  void enter(app::AppContext& ctx) override;
+  void exit(app::AppContext& ctx) override { dialog_.Close(); }
+  void draw(app::AppContext& ctx, LGFX_Sprite& canvas) override;
+  app::Nav handleEvent(const app::Event& msg, app::AppContext& ctx) override;
 
  private:
-  void stepUiFont(int delta);
-  // Opens the confirmation for 字体缓存 清理.
-  void askCleanFontCaches();
-  void cleanFontCaches();
+  void stepUiFont(app::AppContext& ctx, int delta);
+  void askCleanFontCaches(app::AppContext& ctx);
+  void cleanFontCaches(app::AppContext& ctx);
 
-  // UI font choices: "builtin" followed by the .ttf fonts in /fonts. .bin
-  // fonts have a fixed size and would break the 30px UI layout.
   std::vector<std::string> ui_font_options_;
   int ui_font_index_ = 0;
-  // Font cache sizes, scanned on enter() and after cleaning.
+  book::ExpiredRecordsUsage expired_records_;
   fonts::FontCacheUsage cache_usage_;
   Dialog dialog_;
 
-  // Hit areas, recorded by draw().
   Rect reading_row_;
   SelectorRow ui_font_row_;
+  SelectorRow sleep_row_;
   Rect lock_toggle_;
   Rect wallpaper_button_;
   Rect clean_button_;
@@ -49,3 +48,5 @@ class SystemSettingsPage : public Page {
 
 }  // namespace ui
 }  // namespace reader
+
+#endif  // EXPERIMENTAL_USERS_ZHENGSHUYU_READER_INCLUDE_UI_PAGES_SYSTEM_SETTINGS_PAGE_H_

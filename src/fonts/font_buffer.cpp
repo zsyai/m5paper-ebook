@@ -52,6 +52,7 @@ void PageFontCache::dropGlyphs()
 void PageFontCache::clear()
 {
     dropGlyphs();
+    decltype(glyph_map_)().swap(glyph_map_);
     bin_source_.close();
     ttf_source_.close();
     source_ = &bin_source_;

@@ -1,10 +1,8 @@
 #include "ui/page.h"
 
-#include "app/ui_manager.h"
+#include "app/app_context.h"
 
-extern UIManager ui;
-
-void Page::show() {
-  draw(ui.getCanvas());
-  ui.pushUiFrame();
+void Page::show(reader::app::AppContext& ctx) {
+  draw(ctx, ctx.canvas());
+  ctx.frame.PushUiFrame();
 }

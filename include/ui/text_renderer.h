@@ -9,6 +9,7 @@
 
 #include <M5GFX.h>
 
+#include <cstdint>
 #include <string>
 
 #include "fonts/font_buffer.h"
@@ -18,11 +19,12 @@ namespace ui {
 
 // Copies glyph bitmaps into the 8-bit grayscale `canvas`, top-left of the
 // first line at (x, y). '\n' starts a new line `line_height` lower.
-// Glyph boxes overwrite the background, so draw on white, or pass
-// `inverted` to draw white text on black.
+// Glyph boxes overwrite the background when `fg_gray == 0`, blend toward
+// `fg_gray` over lighter pixels when `fg_gray > 0`, or draw white text on black
+// when `inverted` is true.
 void DrawText(LGFX_Sprite& canvas, PageFontCache& cache,
               const std::string& text, int x, int y, int line_height,
-              bool inverted = false);
+              bool inverted = false, uint8_t fg_gray = 0);
 
 // Dashed grey line under every text line of an area of `w` x `h` pixels at
 // (x, y) laid out with `font_size` glyphs every `line_height` pixels, i.e.

@@ -43,6 +43,9 @@ public:
     // Drops cached glyphs and closes the font; the next build() reopens it.
     void clear();
 
+    // Decoded glyph bitmap bytes currently resident in PSRAM.
+    size_t cachedBytes() const { return cached_bytes_; }
+
     // Query character
     bool hasChar(uint16_t unicode) const;
 

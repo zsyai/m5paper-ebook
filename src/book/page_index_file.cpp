@@ -1,5 +1,9 @@
 #include "book/page_index_file.h"
+#include "hal/storage.h"
+#include "core/sd_path.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 #include "core/perf_trace.h"
@@ -16,7 +20,7 @@ constexpr uint16_t kVersion = 3;
 //   char[4] magic, u16 version, u16 reserved,
 //   u32 file_size, u32 data_start, u32 font_hash,
 //   u16 font_size, u16 line_height, u16 text_w, u16 text_h,
-//   u8 encoding, u8 paragraph_indent, u8 orientation, u8 reserved,
+//   u8 encoding, u8 paragraph_indent, u8 orientation, u8 mid_book_anchor,
 //   u16 margin, u16 reserved, u32 page_count, then u32 offsets[].
 struct __attribute__((packed)) Header {
   char magic[4];
@@ -32,13 +36,13 @@ struct __attribute__((packed)) Header {
   uint8_t encoding;
   uint8_t paragraph_indent;
   uint8_t orientation;
-  uint8_t reserved1;
+  uint8_t mid_book_anchor;
   uint16_t margin;
   uint16_t reserved2;
   uint32_t page_count;
 };
 
-std::string SdPath(const std::string& path) { return "/sd" + path; }
+using core::SdPath;
 
 }  // namespace
 
@@ -69,9 +73,10 @@ std::string IndexPathForBook(const std::string& book_path) {
 }
 
 bool LoadPageIndex(const std::string& idx_path, const IndexKey& key,
-                   std::vector<uint32_t>* pages) {
+                   std::vector<uint32_t>* pages, bool* mid_book_anchor) {
   PERF_SCOPE("book::LoadPageIndex");
   pages->clear();
+  if (mid_book_anchor) *mid_book_anchor = false;
   FILE* f = fopen(SdPath(idx_path).c_str(), "rb");
   if (!f) return false;
 
@@ -101,17 +106,24 @@ bool LoadPageIndex(const std::string& idx_path, const IndexKey& key,
          h.page_count;
   }
   fclose(f);
-  if (!ok) pages->clear();
+  if (!ok) {
+    pages->clear();
+  } else if (mid_book_anchor) {
+    *mid_book_anchor = h.mid_book_anchor != 0;
+  }
   PERF_VALUE("index.loaded_pages", pages->size());
   return ok;
 }
 
 bool SavePageIndex(const std::string& idx_path, const IndexKey& key,
-                   const std::vector<uint32_t>& pages) {
+                   const std::vector<uint32_t>& pages, bool mid_book_anchor) {
   PERF_SCOPE("book::SavePageIndex");
   if (pages.empty()) return false;
   FILE* f = fopen(SdPath(idx_path).c_str(), "wb");
-  if (!f) return false;
+  if (!f) {
+    hal::ReportSdError();
+    return false;
+  }
 
   Header h = {};
   for (int i = 0; i < 4; ++i) h.magic[i] = kMagic[i];
@@ -127,6 +139,7 @@ bool SavePageIndex(const std::string& idx_path, const IndexKey& key,
   h.margin = key.margin;
   h.paragraph_indent = key.paragraph_indent;
   h.orientation = key.orientation;
+  h.mid_book_anchor = mid_book_anchor ? 1 : 0;
   h.page_count = pages.size();
 
   bool ok = fwrite(&h, sizeof(h), 1, f) == 1 &&
@@ -135,6 +148,39 @@ bool SavePageIndex(const std::string& idx_path, const IndexKey& key,
   ok = (fclose(f) == 0) && ok;
   if (!ok) remove(SdPath(idx_path).c_str());
   return ok;
+}
+
+int PageIndexForPercentage(size_t page_count, float percentage) {
+  if (page_count <= 1) return 0;
+  const double clamped =
+      std::max(0.0, std::min(100.0, static_cast<double>(percentage)));
+  const size_t max_index = page_count - 1;
+  const long target =
+      std::lround(static_cast<double>(max_index) * (clamped / 100.0));
+  if (target <= 0) return 0;
+  if (static_cast<size_t>(target) >= max_index) {
+    return static_cast<int>(max_index);
+  }
+  return static_cast<int>(target);
+}
+
+float ProgressForPageIndex(int page_index, size_t page_count) {
+  if (page_count == 0 || page_index < 0) return 0.0f;
+  if (page_count == 1 || static_cast<size_t>(page_index + 1) >= page_count) {
+    return 100.0f;
+  }
+  if (page_index == 0) return 0.0f;
+  return static_cast<float>(static_cast<double>(page_index) * 100.0 /
+                            static_cast<double>(page_count - 1));
+}
+
+int RoundedBookshelfProgress(float progress, bool at_start, bool completed) {
+  if (completed) return 100;
+  if (at_start || progress <= 0.0f) return 0;
+  const long rounded = std::lround(static_cast<double>(progress));
+  if (rounded <= 0) return 0;
+  if (rounded >= 99) return 99;
+  return static_cast<int>(rounded);
 }
 
 }  // namespace book

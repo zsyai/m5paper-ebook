@@ -6,6 +6,7 @@
 // view draws with it; the fields that change page breaks also go into the
 // page index key (see BookReader::makeIndexKey).
 
+#include <cmath>
 #include <string>
 
 #include "core/settings.h"
@@ -33,7 +34,7 @@ struct ReadingStyle {
 
   // Distance between baselines for glyphs of `font_size` pixels.
   int LineHeight(int font_size) const {
-    return static_cast<int>(font_size * line_spacing);
+    return static_cast<int>(std::lround(font_size * line_spacing));
   }
 
   // The canvas minus the margin on every side (at least 1x1).

@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "fonts/font_buffer.h"
 
@@ -39,6 +40,14 @@ bool CannotStartLine(uint32_t unicode);
 // Characters dropped from the start of a paragraph when indenting.
 bool IsIndentSpace(uint32_t unicode);
 
+// Prefix of a standalone EPUB illustration line in `.epc` ("\\x1EIMG:<idx>\\n").
+constexpr uint8_t kImagePageSentinel = 0x1E;
+constexpr char kImagePagePrefix[] = "\x1EIMG:";
+
+// Parses a standalone illustration page marker produced by `MeasurePage`,
+// returning true and storing the 0-based ZIP entry index on match.
+bool ParseImagePageMarker(const std::string& text, uint32_t* zip_entry_index);
+
 // Lays out UTF-8 `text` starting at `cursor` using glyph widths from the font
 // index (no bitmap I/O). Returns the number of bytes that fit on the page and
 // sets `*page_filled` once the page is full.
@@ -49,6 +58,28 @@ bool IsIndentSpace(uint32_t unicode);
 size_t MeasurePage(const uint8_t* text, size_t len, const LayoutParams& layout,
                    const PageFontCache& cache, LayoutCursor* cursor,
                    bool* page_filled, std::string* out = nullptr);
+
+struct LineSpan {
+  // Byte offset in `text` where starting MeasurePage reproduces this line and
+  // all following lines.
+  size_t utf8_start;
+  // True if at least one visible character or paragraph indent sits on this
+  // line (the positions where MeasurePage checks text_h).
+  bool has_visible;
+  // False only in the degenerate case where a 2-em indent wraps before the
+  // paragraph's first character, so `utf8_start` still sits right after '\n'.
+  bool can_start_page;
+  // True when this span is a standalone full-page item (e.g. an EPUB image
+  // marker) that cannot share a page with preceding or following lines.
+  bool standalone_page;
+};
+
+// Wraps UTF-8 `text` into visual lines with the same line-breaking rules as
+// MeasurePage (ignoring text_h), used to paginate backward from a mid-book
+// anchor in a single linear pass per window.
+void MeasureLines(const uint8_t* text, size_t len, const LayoutParams& layout,
+                  const PageFontCache& cache, bool start_is_paragraph,
+                  std::vector<LineSpan>* lines);
 
 }  // namespace book
 }  // namespace reader

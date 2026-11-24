@@ -12,6 +12,17 @@ namespace hal {
 // for the panel refresh, so logs show the real time-to-visible.
 void PushFrame(LGFX_Sprite& canvas, lgfx::epd_mode_t mode);
 
+// Pushes a full-screen 8-bit grayscale reading `canvas` directly to the IT8951
+// as bulk 4bpp SPI DMA transfers without M5GFX's per-row RGB888 expansion or
+// Bayer dithering, triggering GC16 when `full_refresh` is true or GL16
+// otherwise. Falls back to `PushFrame` if `canvas` or panel differs.
+void PushReadingFrame(LGFX_Sprite& canvas, bool full_refresh);
+
+// Pushes only the canvas rectangle (x, y, w, h), given in the canvas's own
+// (possibly rotated) coordinates, so the panel refreshes just that area.
+void PushRegion(LGFX_Sprite& canvas, int x, int y, int w, int h,
+                lgfx::epd_mode_t mode);
+
 // Counts frames so that every `interval`-th one is a full refresh.
 class RefreshCounter {
  public:

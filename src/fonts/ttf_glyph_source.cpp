@@ -1,4 +1,6 @@
 #include "fonts/ttf_glyph_source.h"
+#include "core/sd_path.h"
+#include "hal/storage.h"
 
 #include <esp32-hal-log.h>
 #include <esp_heap_caps.h>
@@ -24,7 +26,6 @@ namespace fonts {
 namespace {
 
 // Arduino's SD library mounts the card's FAT volume here.
-constexpr char kVfsMount[] = "/sd";
 
 // Small read cache for glyf data. A miss reads the request rounded out to
 // whole 512 B sectors (at least kMinRead), so neighbouring glyphs often share
@@ -68,10 +69,7 @@ void* PsramAlloc(size_t bytes) {
 
 }  // namespace
 
-TtfGlyphSource::~TtfGlyphSource() {
-  close();
-  free(decoded_);
-}
+TtfGlyphSource::~TtfGlyphSource() { close(); }
 
 void TtfGlyphSource::close() {
   if (face_ != nullptr) {
@@ -97,6 +95,9 @@ void TtfGlyphSource::close() {
   use_clock_ = 0;
   free(advance_px_);
   advance_px_ = nullptr;
+  free(decoded_);
+  decoded_ = nullptr;
+  decoded_cap_ = 0;
   file_size_ = 0;
   fd_pos_ = 0;
   num_hmetrics_ = 0;
@@ -112,7 +113,7 @@ bool TtfGlyphSource::openFile(const std::string& path, uint8_t pixel_size) {
   FT_Library library = Library();
   if (library == nullptr) return false;
 
-  fd_ = ::open((std::string(kVfsMount) + path).c_str(), O_RDONLY);
+  fd_ = ::open(reader::core::SdPath(path).c_str(), O_RDONLY);
   if (fd_ < 0) return false;
   struct stat st;
   if (fstat(fd_, &st) != 0 || st.st_size <= 0) {
@@ -264,14 +265,19 @@ uint32_t TtfGlyphSource::glyphIndex(uint16_t unicode) const {
 }
 
 size_t TtfGlyphSource::readAt(uint32_t offset, uint8_t* buffer, size_t count) {
+  reader::hal::CheckSdTaskInvariant("TtfGlyphSource::readAt");
   const int64_t t0 = esp_timer_get_time();
   if (fd_pos_ != offset) {
-    if (lseek(fd_, offset, SEEK_SET) != static_cast<off_t>(offset)) return 0;
+    if (lseek(fd_, offset, SEEK_SET) != static_cast<off_t>(offset)) {
+      reader::hal::ReportSdError();
+      return 0;
+    }
     fd_pos_ = offset;
   }
   size_t got = 0;
   while (got < count) {
     const ssize_t n = ::read(fd_, buffer + got, count - got);
+    if (n < 0) reader::hal::ReportSdError();
     if (n <= 0) break;
     got += static_cast<size_t>(n);
   }

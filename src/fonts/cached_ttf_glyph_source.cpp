@@ -1,4 +1,5 @@
 #include "fonts/cached_ttf_glyph_source.h"
+#include "core/sd_path.h"
 
 #include <esp32-hal-log.h>
 #include <sys/stat.h>
@@ -12,7 +13,6 @@ namespace reader {
 namespace fonts {
 namespace {
 
-constexpr char kVfsMount[] = "/sd";
 // Bump when the cache layout or rendering changes to force rebuilds.
 constexpr char kCacheKeyVersion[] = "ttfc3";
 
@@ -44,7 +44,7 @@ bool CachedTtfGlyphSource::openFile(const std::string& path,
   PERF_SCOPE("CachedTtfGlyphSource::openFile");
   close();
   struct stat st;
-  if (stat((kVfsMount + path).c_str(), &st) != 0 || st.st_size <= 0) {
+  if (stat(core::SdPath(path).c_str(), &st) != 0 || st.st_size <= 0) {
     return false;
   }
   path_ = path;

@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 enum class TextEncoding {
   UTF8,
@@ -36,6 +37,12 @@ std::string ToUtf8(const uint8_t* raw, size_t len, TextEncoding enc);
 // ToUtf8(raw).
 size_t RawBytesForUtf8Prefix(const uint8_t* raw, size_t len, TextEncoding enc,
                              size_t utf8_bytes);
+
+// Maps sorted `utf8_offsets` (byte offsets in ToUtf8(raw, len, enc)) to raw
+// byte offsets in [0, len] in a single pass.
+void MapUtf8OffsetsToRaw(const uint8_t* raw, size_t len, TextEncoding enc,
+                         const std::vector<size_t>& utf8_offsets,
+                         std::vector<size_t>* raw_offsets);
 
 }  // namespace book
 }  // namespace reader

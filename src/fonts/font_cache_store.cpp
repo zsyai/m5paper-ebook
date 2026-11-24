@@ -1,4 +1,5 @@
 #include "fonts/font_cache_store.h"
+#include "core/sd_path.h"
 
 #include <dirent.h>
 #include <esp32-hal-log.h>
@@ -14,7 +15,6 @@ namespace reader {
 namespace fonts {
 namespace {
 
-constexpr char kVfsMount[] = "/sd";
 // No trailing '/': this FatFS build (FF_FS_RPATH = 0) rejects directory
 // paths that end in a separator, so opendir() would fail.
 constexpr char kCacheDir[] = "/configs/fontcache";
@@ -39,7 +39,7 @@ bool IsKept(const std::string& path, const std::vector<std::string>& in_use) {
 // Calls `fn(sd_path, size)` for every regular file in the cache directory.
 void ForEachCacheFile(
     const std::function<void(const std::string&, uint64_t)>& fn) {
-  const std::string dir_path = std::string(kVfsMount) + kCacheDir;
+  const std::string dir_path = core::SdPath(kCacheDir);
   DIR* dir = opendir(dir_path.c_str());
   if (dir == nullptr) {
     // Normal before the first cache is written.
@@ -89,7 +89,7 @@ int RemoveUnusedFontCaches(const std::vector<std::string>& in_use) {
   int removed = 0;
   ForEachCacheFile([&](const std::string& path, uint64_t /*size*/) {
     if (IsKept(path, in_use)) return;
-    if (unlink((kVfsMount + path).c_str()) == 0) {
+    if (unlink(core::SdPath(path).c_str()) == 0) {
       log_i("fontcache: removed %s", path.c_str());
       ++removed;
     } else {

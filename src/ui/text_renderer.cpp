@@ -27,7 +27,7 @@ bool IsSkipped(uint32_t unicode) {
 
 void DrawText(LGFX_Sprite& canvas, PageFontCache& cache,
               const std::string& text, int x, int y, int line_height,
-              bool inverted) {
+              bool inverted, uint8_t fg_gray) {
   const CanvasPixels pixels(canvas);
   if (!pixels.valid()) return;
   const int canvas_w = pixels.width();
@@ -74,6 +74,17 @@ void DrawText(LGFX_Sprite& canvas, PageFontCache& cache,
         const uint8_t* in = bitmap + row * info->bitmapW + src_x;
         if (inverted) {
           for (int i = 0; i < copy_w; ++i) out[i * step] = 255 - in[i];
+        } else if (fg_gray > 0) {
+          for (int i = 0; i < copy_w; ++i) {
+            const uint8_t alpha = 255 - in[i];
+            if (alpha > 0) {
+              uint8_t& d = out[i * step];
+              if (d > fg_gray) {
+                d = static_cast<uint8_t>(
+                    d - ((alpha * (d - fg_gray) + 127) / 255));
+              }
+            }
+          }
         } else if (step == 1) {
           memcpy(out, in, copy_w);
         } else {

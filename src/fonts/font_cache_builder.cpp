@@ -1,4 +1,6 @@
 #include "fonts/font_cache_builder.h"
+#include "hal/storage.h"
+#include "core/sd_path.h"
 
 #include <esp32-hal-log.h>
 #include <esp_heap_caps.h>
@@ -27,7 +29,6 @@ constexpr size_t kStyleOffset = kNameOffset + kFieldSize;
 constexpr size_t kEntrySize = sizeof(CharGlyphInfo);
 constexpr uint8_t kVersion4Bpp = 2;
 
-constexpr char kVfsMount[] = "/sd";
 constexpr size_t kWriteBufferSize = 16 * 1024;
 // Glyphs per loadGlyphs() call; ~3.5 ms each, so the time budget is checked
 // every ~15 ms.
@@ -38,7 +39,7 @@ std::vector<std::string>& ActivePaths() {
   return paths;
 }
 
-std::string SdPath(const std::string& path) { return kVfsMount + path; }
+using core::SdPath;
 
 // Creates every directory on the way to `path` (a file path).
 void MakeParentDirs(const std::string& path) {
@@ -257,6 +258,7 @@ bool FontCacheBuilder::begin() {
   fd_ = ::open(SdPath(tmp_path_).c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0664);
   if (fd_ < 0) {
     fail("open");
+    hal::ReportSdError();
     return false;
   }
   // Placeholder for the header and index; rewritten by finish().

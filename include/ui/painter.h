@@ -4,6 +4,7 @@
 
 #include <M5GFX.h>
 
+#include <cstdint>
 #include <string>
 
 #include "fonts/font_buffer.h"
@@ -35,6 +36,8 @@ class UiPainter {
   // Draws prepared text with its top-left at (x, y); lines are
   // 1.5 x font size apart. `inverted` draws white text on black.
   void Text(const std::string& text, int x, int y, bool inverted = false);
+  // Draws prepared text tinted to `fg_gray` (0x00 = black .. 0xFF = white).
+  void TextGray(const std::string& text, int x, int y, uint8_t fg_gray);
   // Prepares and draws one line of text centered in `r`.
   void TextIn(const std::string& text, const Rect& r, bool inverted = false);
   // Top y that centers one line of text vertically in [top, top + h).

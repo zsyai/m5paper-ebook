@@ -1,4 +1,5 @@
-#pragma once
+#ifndef EXPERIMENTAL_USERS_ZHENGSHUYU_READER_INCLUDE_UI_PAGES_USER_GUIDE_PAGE_H_
+#define EXPERIMENTAL_USERS_ZHENGSHUYU_READER_INCLUDE_UI_PAGES_USER_GUIDE_PAGE_H_
 
 // Built-in user guide page, laid out with book::MeasurePage and drawn with the
 // UI font.
@@ -14,12 +15,9 @@ namespace ui {
 
 class UserGuidePage : public Page {
  public:
-  void init() {}
-
-  void enter() override;
-  void exit() override {}
-  void draw(LGFX_Sprite& canvas) override;
-  State handleEvent(const SystemMessage_t& msg) override;
+  void enter(app::AppContext& ctx) override;
+  void draw(app::AppContext& ctx, LGFX_Sprite& canvas) override;
+  app::Nav handleEvent(const app::Event& msg, app::AppContext& ctx) override;
 
  private:
   std::vector<std::string> pages_;
@@ -27,8 +25,10 @@ class UserGuidePage : public Page {
   int current_page_idx_ = 0;
   Rect back_;
 
-  void paginate(LGFX_Sprite& canvas);
+  void paginate(app::AppContext& ctx, LGFX_Sprite& canvas);
 };
 
 }  // namespace ui
 }  // namespace reader
+
+#endif  // EXPERIMENTAL_USERS_ZHENGSHUYU_READER_INCLUDE_UI_PAGES_USER_GUIDE_PAGE_H_

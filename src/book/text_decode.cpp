@@ -1,5 +1,7 @@
 #include "book/text_decode.h"
 
+#include <algorithm>
+
 #include "book/gbk_unicode_table.h"
 
 namespace reader {
@@ -358,11 +360,24 @@ size_t SafeChunkEnd(const uint8_t* buffer, size_t len, TextEncoding enc) {
     }
     end_pos = safe_end;
   } else {
+    // Walk back over continuation bytes to the last lead byte, then keep
+    // the sequence only if all of its bytes are present. (Dropping every
+    // trailing multi-byte character lost the last character of a file.)
     while (end_pos > 0 && (buffer[end_pos - 1] & 0xC0) == 0x80) {
       end_pos--;
     }
     if (end_pos > 0 && (buffer[end_pos - 1] & 0x80) != 0) {
-      end_pos--;
+      const uint8_t lead = buffer[end_pos - 1];
+      size_t need = 1;
+      if ((lead & 0xE0) == 0xC0) need = 2;
+      else if ((lead & 0xF0) == 0xE0) need = 3;
+      else if ((lead & 0xF8) == 0xF0) need = 4;
+      const size_t have = len - (end_pos - 1);
+      if (have >= need && need > 1) {
+        end_pos = end_pos - 1 + need;
+      } else {
+        end_pos--;
+      }
     }
   }
   return end_pos;
@@ -390,6 +405,105 @@ size_t RawBytesForUtf8Prefix(const uint8_t* raw, size_t len, TextEncoding enc,
   }
   std::string text(reinterpret_cast<const char*>(raw), len);
   return MapConvertedPosToRawConsumed(text, enc, utf8_bytes);
+}
+
+void MapUtf8OffsetsToRaw(const uint8_t* raw, size_t len, TextEncoding enc,
+                         const std::vector<size_t>& utf8_offsets,
+                         std::vector<size_t>* raw_offsets) {
+  raw_offsets->assign(utf8_offsets.size(), len);
+  if (utf8_offsets.empty()) return;
+  if (enc != TextEncoding::GBK && enc != TextEncoding::UTF16LE &&
+      enc != TextEncoding::UTF16BE) {
+    for (size_t k = 0; k < utf8_offsets.size(); ++k) {
+      (*raw_offsets)[k] = std::min(utf8_offsets[k], len);
+    }
+    return;
+  }
+
+  size_t k = 0;
+  size_t acc = 0;
+  auto emit_up_to = [&](size_t acc_now, size_t raw_now) {
+    while (k < utf8_offsets.size() && utf8_offsets[k] <= acc_now) {
+      (*raw_offsets)[k++] = raw_now;
+    }
+  };
+  emit_up_to(0, 0);
+
+  size_t i = 0;
+  if (enc == TextEncoding::GBK) {
+    while (i < len && k < utf8_offsets.size()) {
+      const uint8_t b = raw[i];
+      if (b < 0x80) {
+        acc += 1;
+        i += 1;
+      } else if (b >= 0x81 && b <= 0xFE && i + 3 < len &&
+                 raw[i + 1] >= 0x30 && raw[i + 1] <= 0x39 &&
+                 raw[i + 2] >= 0x81 && raw[i + 2] <= 0xFE &&
+                 raw[i + 3] >= 0x30 && raw[i + 3] <= 0x39) {
+        if (b >= 0x90) {
+          const uint32_t offset = (b - 0x90) * 12600 +
+                                  (raw[i + 1] - 0x30) * 1260 +
+                                  (raw[i + 2] - 0x81) * 10 +
+                                  (raw[i + 3] - 0x30);
+          const uint32_t unicode = 0x10000 + offset;
+          acc += (unicode < 0x110000) ? 4 : 3;
+        } else {
+          acc += 3;
+        }
+        i += 4;
+      } else if (i + 1 < len && b >= 0x81 && b <= 0xFE &&
+                 raw[i + 1] >= 0x40 && raw[i + 1] <= 0xFE &&
+                 raw[i + 1] != 0x7F) {
+        const uint16_t gbk_code =
+            (static_cast<uint16_t>(b) << 8) | static_cast<uint16_t>(raw[i + 1]);
+        const uint16_t uni = gbk_to_unicode_lookup(gbk_code);
+        if (uni != 0) {
+          uint8_t tmp[4];
+          acc += utf8_encode(uni, tmp);
+        } else {
+          acc += 3;
+        }
+        i += 2;
+      } else {
+        acc += 1;
+        i += 1;
+      }
+      emit_up_to(acc, i);
+    }
+    return;
+  }
+
+  // UTF-16LE / UTF-16BE.
+  const bool le = (enc == TextEncoding::UTF16LE);
+  while (i + 1 < len && k < utf8_offsets.size()) {
+    const uint16_t w1 =
+        le ? (raw[i] | (raw[i + 1] << 8)) : ((raw[i] << 8) | raw[i + 1]);
+    if (i == 0 && w1 == 0xFEFF) {
+      i += 2;
+      continue;
+    }
+    uint32_t codepoint = w1;
+    size_t step = 2;
+    if (w1 >= 0xD800 && w1 <= 0xDBFF && i + 3 < len) {
+      const uint16_t w2 = le ? (raw[i + 2] | (raw[i + 3] << 8))
+                             : ((raw[i + 2] << 8) | raw[i + 3]);
+      if (w2 >= 0xDC00 && w2 <= 0xDFFF) {
+        codepoint = 0x10000 + ((w1 - 0xD800) << 10) + (w2 - 0xDC00);
+        step = 4;
+      }
+    }
+    if (codepoint < 0x80) {
+      acc += 1;
+    } else if (codepoint < 0x800) {
+      acc += 2;
+    } else if (codepoint < 0x10000) {
+      acc += 3;
+    } else {
+      acc += 4;
+    }
+    i += step;
+    emit_up_to(acc, i);
+  }
 }
 
 }  // namespace book

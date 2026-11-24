@@ -1,4 +1,6 @@
 #include "fonts/bin_glyph_source.h"
+#include "core/sd_path.h"
+#include "hal/storage.h"
 
 #include <esp_heap_caps.h>
 #include <esp_timer.h>
@@ -20,7 +22,6 @@ constexpr size_t kNameSize = 64;
 constexpr size_t kStyleOffset = kNameOffset + kNameSize;
 
 // Arduino's SD library mounts the card's FAT volume here.
-constexpr char kVfsMount[] = "/sd";
 
 // Coalescing policy: neighbouring glyphs whose bitmaps are at most kMaxGap
 // bytes apart are fetched with one read, up to kMaxRun bytes per read.
@@ -33,16 +34,12 @@ bool IsEmpty(const CharGlyphInfo& g) {
 
 }  // namespace
 
-BinGlyphSource::~BinGlyphSource() {
-  close();
-  free(scratch_);
-  free(decoded_);
-}
+BinGlyphSource::~BinGlyphSource() { close(); }
 
 bool BinGlyphSource::openFile(const std::string& path) {
   PERF_SCOPE("BinGlyphSource::openFile");
   close();
-  fd_ = ::open((std::string(kVfsMount) + path).c_str(), O_RDONLY);
+  fd_ = ::open(reader::core::SdPath(path).c_str(), O_RDONLY);
   if (fd_ < 0) return false;
   if (!loadHeaderAndIndex()) {
     close();
@@ -71,6 +68,12 @@ void BinGlyphSource::close() {
   mem_size_ = 0;
   free(index_);
   index_ = nullptr;
+  free(scratch_);
+  scratch_ = nullptr;
+  scratch_cap_ = 0;
+  free(decoded_);
+  decoded_ = nullptr;
+  decoded_cap_ = 0;
   count_ = 0;
   bitmap_base_ = 0;
   font_size_ = 0;
@@ -134,13 +137,20 @@ const uint8_t* BinGlyphSource::fetch(uint32_t offset, size_t len) {
     return mem_ + offset;
   }
   if (fd_ < 0 || !ensureBuffer(&scratch_, &scratch_cap_, len)) return nullptr;
+  reader::hal::CheckSdTaskInvariant("BinGlyphSource::fetch");
+  // Offsets come from the font's own index, so a failure here means the
+  // card is gone or broken rather than a bad request.
   if (::lseek(fd_, offset, SEEK_SET) != static_cast<off_t>(offset)) {
+    reader::hal::ReportSdError();
     return nullptr;
   }
   size_t done = 0;
   while (done < len) {
     const ssize_t n = ::read(fd_, scratch_ + done, len - done);
-    if (n <= 0) return nullptr;
+    if (n <= 0) {
+      reader::hal::ReportSdError();
+      return nullptr;
+    }
     done += n;
   }
   return scratch_;

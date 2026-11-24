@@ -1,4 +1,5 @@
 #include "core/sd_bench.h"
+#include "core/sd_path.h"
 
 #include "core/perf_trace.h"
 
@@ -91,7 +92,7 @@ void BenchPosixSequential(const std::string& vfs_path, uint32_t start,
 
 void RunSdBenchmark(const std::string& sd_path) {
   PERF_SCOPE("SdBenchmark");
-  const std::string vfs_path = "/sd" + sd_path;
+  const std::string vfs_path = SdPath(sd_path);
   struct stat st;
   if (::stat(vfs_path.c_str(), &st) != 0 || st.st_size < 256 * 1024) {
     PERF_VALUE("bench.skipped", 1);

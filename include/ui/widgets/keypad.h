@@ -29,6 +29,8 @@ class Keypad {
   // of mode buttons; `mode` is the selected one.
   void Open(const std::string& title, int max_digits,
             const std::vector<std::string>& modes = {}, int mode = 0);
+  // Opens a decimal keypad (with a '.' key and one fractional digit).
+  void OpenDecimal(const std::string& title, int max_digits);
   void Close() { open_ = false; }
   bool is_open() const { return open_; }
 
@@ -49,6 +51,7 @@ class Keypad {
   void Layout(int canvas_w, int canvas_h, int fs);
 
   bool open_ = false;
+  bool allow_decimal_ = false;
   std::string title_;
   std::string text_;
   int max_digits_ = 0;
@@ -60,8 +63,9 @@ class Keypad {
   Rect input_;
   Rect mode_row_;
   Segmented mode_control_;
-  Rect keys_[12];  // 1-9, 删除, 0, 确定
+  Rect keys_[12];  // Integer: 1-9, 删除, 0, 确定; Decimal: 1-9, ., 0, 删除
   Rect cancel_;
+  Rect ok_;
 };
 
 }  // namespace ui
