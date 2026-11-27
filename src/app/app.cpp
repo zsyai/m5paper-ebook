@@ -15,6 +15,7 @@
 #include "core/perf_trace.h"
 #include "hal/input.h"
 #include "hal/storage.h"
+#include "i18n/i18n.h"
 
 namespace reader {
 namespace app {
@@ -40,6 +41,7 @@ void App::Init(QueueHandle_t* event_queue) {
   PERF_SCOPE("App::Init");
   ctx_.event_queue = event_queue;
   settings_.Load();
+  i18n::SetLanguage(settings_.language);
   book_.ApplyStyle(settings_);
   fonts_.Init(settings_);
   frame_.Init(fonts_.EffectiveUiFontPath(settings_), settings_.orientation,
@@ -195,7 +197,7 @@ void App::HandleSdError() {
 
 bool App::RemountStorage() {
   if (!storage_.Remount()) {
-    frame_.ShowPromptBox("未检测到TF卡，插入后点击屏幕重试");
+    frame_.ShowPromptBox(TR("未检测到TF卡，插入后点击屏幕重试"));
     hal::TakeSdError();
     return false;
   }

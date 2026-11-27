@@ -1,6 +1,8 @@
 #ifndef EXPERIMENTAL_USERS_ZHENGSHUYU_READER_INCLUDE_UI_PAGES_USER_GUIDE_TEXT_H_
 #define EXPERIMENTAL_USERS_ZHENGSHUYU_READER_INCLUDE_UI_PAGES_USER_GUIDE_TEXT_H_
-const char* USER_GUIDE_TEXT = R"====(【功能说明】
+// Built-in user guide, Simplified Chinese. Other languages are in
+// user_guide_text_<lang>.h.
+constexpr char kUserGuideTextZhHans[] = R"====(【功能说明】
 
 1. 书架：显示SD卡 /books 目录下的 .txt 与 .epub 书籍列表（TXT 支持 UTF-8、UTF-16 LE/BE、GBK/GB18030 编码，EPUB 优先展示书名并支持独立插图页）与阅读进度。点击顶栏中间排序项可按最近阅读、书名、阅读进度或最近导入排序；长按书籍可清除记录或删除文件。上下/左右滑动或拨动滚轮可翻页，短按滚轮键可全刷清残影，底部可进入传书、设置或休眠。
 
@@ -15,8 +17,9 @@ const char* USER_GUIDE_TEXT = R"====(【功能说明】
 4. 系统设置：
 4.1 界面字体：支持内置 30px 字体或 /fonts 目录下的 TTF/OTF 字体。
 4.2 休眠模式：深度休眠或浅休眠，区别见下方「休眠与唤醒」。
-4.3 锁屏壁纸：可开启或关闭休眠壁纸，并在 /images 目录中选择图片。
-4.4 缓存清理：一键清理已删除书籍遗留的无效阅读记录与缓存（.cfg/.idx/.epc/.toc），或清理当前未使用的 TTF 字体缓存文件。
+4.3 语言：界面语言，简体中文或 Français（法语）。
+4.4 锁屏壁纸：可开启或关闭休眠壁纸，并在 /images 目录中选择图片。
+4.5 缓存清理：一键清理已删除书籍遗留的无效阅读记录与缓存（.cfg/.idx/.epc/.toc），或清理当前未使用的 TTF 字体缓存文件。
 
 5. 休眠与唤醒：在书架、系统设置或阅读菜单中点击「休眠」进入休眠，唤醒后回到休眠前的页面或阅读位置。
 5.1 深度休眠（默认）：设备完全断电，最省电。向内长按滚轮键 3 秒开机。

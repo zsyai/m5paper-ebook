@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "i18n/i18n.h"
 #include "ui/page.h"
 #include "ui/rect.h"
 
@@ -22,6 +23,7 @@ class UserGuidePage : public Page {
  private:
   std::vector<std::string> pages_;
   std::string layout_font_path_;
+  i18n::Language layout_language_ = i18n::Language::kZhHans;
   int current_page_idx_ = 0;
   Rect back_;
 

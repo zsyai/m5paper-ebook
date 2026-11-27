@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "i18n/i18n.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
 
@@ -20,7 +21,7 @@ class Dialog {
   // An empty `cancel_label` shows only the confirm button.
   void Open(const std::string& title, const std::vector<std::string>& lines,
             const std::string& confirm_label,
-            const std::string& cancel_label = "取消");
+            const std::string& cancel_label = TR("取消"));
   void Close() { open_ = false; }
   bool is_open() const { return open_; }
 

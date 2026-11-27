@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cstdio>
 
+#include "i18n/i18n.h"
+
 namespace reader {
 namespace ui {
 
@@ -22,7 +24,7 @@ Rect DrawBackHeader(UiPainter& p, int bar_h, int battery_level) {
   const int half_w = screen_w / 2;
   canvas.fillRect(0, 0, screen_w, bar_h, TFT_WHITE);
   const Rect back{0, 0, half_w, bar_h};
-  p.TextIn("返回", back);
+  p.TextIn(TR("返回"), back);
   canvas.drawFastVLine(half_w, 0, bar_h, TFT_BLACK);
   DrawBattery(p, screen_w - 20, p.CenterY(0, bar_h), battery_level);
   canvas.fillRect(0, bar_h - 4, screen_w, 4, TFT_BLACK);

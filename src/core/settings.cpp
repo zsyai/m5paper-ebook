@@ -166,6 +166,9 @@ bool Settings::Load() {
       lock_screen_path = value;
     } else if (key == "sleep_mode") {
       sleep_mode = static_cast<SleepMode>(Clamp(atoi(value.c_str()), 0, 1));
+    } else if (key == "language") {
+      language = static_cast<i18n::Language>(
+          Clamp(atoi(value.c_str()), 0, i18n::kLanguageCount - 1));
     } else if (key == "bookshelf_sort") {
       bookshelf_sort = static_cast<BookshelfSort>(
           Clamp(atoi(value.c_str()), 0, kBookshelfSortCount - 1));
@@ -208,6 +211,7 @@ bool Settings::Save() const {
   fprintf(f, "lock_screen_enabled=%d\n", lock_screen_enabled ? 1 : 0);
   fprintf(f, "lock_screen_path=%s\n", lock_screen_path.c_str());
   fprintf(f, "sleep_mode=%d\n", static_cast<int>(sleep_mode));
+  fprintf(f, "language=%d\n", static_cast<int>(language));
   fprintf(f, "bookshelf_sort=%d\n", static_cast<int>(bookshelf_sort));
   fprintf(f, "read_seq=%u\n", static_cast<unsigned>(read_seq));
   return fclose(f) == 0;

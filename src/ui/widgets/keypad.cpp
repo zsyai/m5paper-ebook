@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "i18n/i18n.h"
 #include "ui/widgets/controls.h"
 
 namespace reader {
@@ -124,7 +125,7 @@ void Keypad::Draw(UiPainter& p) {
     const Rect& key = keys_[i];
     const bool filled = !allow_decimal_ && (i == kOkKey);
     if (filled) canvas.fillRect(key.x, key.y, key.w, key.h, TFT_BLACK);
-    p.TextIn(labels[i], key, filled);
+    p.TextIn(TRC("keypad", labels[i]), key, filled);
   }
   for (int col = 1; col < 3; ++col) {
     canvas.drawFastVLine(keys_[col].x, grid.y, grid.h, TFT_BLACK);
@@ -135,10 +136,10 @@ void Keypad::Draw(UiPainter& p) {
   canvas.drawRect(grid.x, grid.y, grid.w, grid.h, TFT_BLACK);
 
   if (allow_decimal_) {
-    DrawButton(p, cancel_, "取消");
-    DrawButton(p, ok_, "确定", /*filled=*/true);
+    DrawButton(p, cancel_, TR("取消"));
+    DrawButton(p, ok_, TR("确定"), /*filled=*/true);
   } else {
-    p.TextIn("取消", cancel_);
+    p.TextIn(TR("取消"), cancel_);
   }
 }
 

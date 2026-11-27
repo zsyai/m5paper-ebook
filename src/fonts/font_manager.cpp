@@ -1,5 +1,6 @@
 #include "fonts/font_manager.h"
 #include "core/perf_trace.h"
+#include "i18n/i18n.h"
 #include <SD.h>
 #include <algorithm>
 
@@ -90,7 +91,7 @@ std::vector<std::string> FontManager::scanAvailableFonts() {
 }
 
 std::string FontManager::displayName(const std::string& path) {
-    if (path.empty() || path == "builtin") return "内置";
+    if (path.empty() || path == "builtin") return TR("内置");
     size_t last_slash = path.find_last_of('/');
     std::string name =
         (last_slash == std::string::npos) ? path : path.substr(last_slash + 1);

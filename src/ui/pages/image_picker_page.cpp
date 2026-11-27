@@ -15,6 +15,7 @@
 #include "book/jpeg_gray_decoder.h"
 #include "hal/input.h"
 #include "hal/storage.h"
+#include "i18n/i18n.h"
 #include "ui/widgets/bars.h"
 
 namespace reader {
@@ -241,12 +242,12 @@ void ImagePickerPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
       current_image_index_ < static_cast<int>(image_files_.size())) {
     const std::string& path = image_files_[current_image_index_];
     if (!DrawCenteredImage(canvas, path)) {
-      p.Prepare("图片解析失败");
-      p.Text("图片解析失败", 20, screen_h / 2);
+      p.Prepare(TR("图片解析失败"));
+      p.Text(TR("图片解析失败"), 20, screen_h / 2);
     }
   } else {
-    p.Prepare("无图片文件");
-    p.Text("无图片文件", 20, screen_h / 2);
+    p.Prepare(TR("无图片文件"));
+    p.Text(TR("无图片文件"), 20, screen_h / 2);
   }
 
   back_ = Rect{};
@@ -255,7 +256,7 @@ void ImagePickerPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
     if (!image_files_.empty()) {
       const bool is_current =
           image_files_[current_image_index_] == ctx.settings.lock_screen_path;
-      ctx.DrawBottomBar({is_current ? "当前选择" : "设为锁屏"});
+      ctx.DrawBottomBar({is_current ? TR("当前选择") : TR("设为锁屏")});
     }
   }
 }

@@ -1,5 +1,7 @@
 #include "ui/widgets/controls.h"
 
+#include "i18n/i18n.h"
+
 namespace reader {
 namespace ui {
 
@@ -28,7 +30,7 @@ void DrawButton(UiPainter& p, const Rect& r, const std::string& label,
 }
 
 void DrawToggle(UiPainter& p, const Rect& r, bool on) {
-  DrawButton(p, r, on ? "开" : "关", on);
+  DrawButton(p, r, on ? TR("开") : TR("关"), on);
 }
 
 void Segmented::Draw(UiPainter& p, const Rect& area,

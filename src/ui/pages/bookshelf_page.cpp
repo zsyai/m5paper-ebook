@@ -15,6 +15,7 @@
 #include "core/perf_trace.h"
 #include "hal/input.h"
 #include "hal/storage.h"
+#include "i18n/i18n.h"
 #include "ui/text_renderer.h"
 #include "ui/widgets/bars.h"
 
@@ -32,12 +33,12 @@ constexpr uint8_t kTrackPale = 0xD8;
 
 std::string FormatBookStatus(const BookInfo& book) {
   if (book.progress >= 100) {
-    return book.isLastRead ? "上次读完" : "已读完";
+    return book.isLastRead ? TR("上次读完") : TR("已读完");
   }
   if (book::HasBookBeenOpened(book)) {
     return std::to_string(book.progress) + "%";
   }
-  return "未读";
+  return TR("未读");
 }
 
 std::string FormatBookMeta(const BookInfo& book) {
@@ -52,7 +53,7 @@ std::string FormatBookMeta(const BookInfo& book) {
                   book.size / (1024.0 * 1024.0));
   }
   if (book.isLastRead && book.progress < 100) {
-    return std::string("上次阅读 · ") + fmt + " · " + size_buf;
+    return std::string(TR("上次阅读 · ")) + fmt + " · " + size_buf;
   }
   return std::string(fmt) + " · " + size_buf;
 }
@@ -89,16 +90,17 @@ void BookshelfPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   const bool has_card = ctx.storage.card_present();
   const bool fallback_font = ctx.fonts.IsUsingFallbackBuiltin(&ctx.settings);
 
-  std::string preload =
+  std::string preload = i18n::GlyphPreload(
       "书架排序方式最近阅读书名阅读进度最近导入上次阅读上次读完已读完未读"
-      "上一页下一页传书设置休眠取消<>·/%0123456789.MBKBEPUBTXT ";
+      "上一页下一页传书设置休眠取消<>·/%0123456789.MBKBEPUBTXT ");
   if (!has_card) {
-    preload += "未检测到TF卡";
+    preload += TR("未检测到TF卡");
   } else if (books.empty()) {
-    preload += "未找到书籍。";
+    preload += TR("未找到书籍。");
   }
   if (fallback_font) {
-    preload += "字体文件缺失，正在使用内置字体请通过“传书”上传字体文件";
+    preload += TR("字体文件缺失，正在使用内置字体");
+    preload += TR("请通过“传书”上传字体文件");
   }
   for (const BookInfo& book : books) {
     preload += book.title;
@@ -119,11 +121,11 @@ void BookshelfPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   // battery indicator.
   sort_rect_ = Rect{};
   const int header_text_y = p.CenterY(0, header_h);
-  p.Text("书架", 20, header_text_y);
+  p.Text(TR("书架"), 20, header_text_y);
   if (has_card) {
     if (!books.empty()) {
       const std::string count_str = std::to_string(books.size());
-      p.TextGray(count_str, 20 + p.Width("书架") + 10, header_text_y,
+      p.TextGray(count_str, 20 + p.Width(TR("书架")) + 10, header_text_y,
                  kInkSecondary);
     }
     const std::string sort_label =
@@ -202,7 +204,7 @@ void BookshelfPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   }
 
   if (has_card && books.empty()) {
-    p.Text("未找到书籍。", 20, header_h + 24);
+    p.Text(TR("未找到书籍。"), 20, header_h + 24);
   }
 
   prev_page_rect_ = Rect{};
@@ -211,7 +213,7 @@ void BookshelfPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
     const int pager_text_y = p.CenterY(pager_top, pager_h);
     if (page_index_ > 0) {
       prev_page_rect_ = Rect{0, pager_top, screen_w / 3, pager_h};
-      p.Text("< 上一页", 20, pager_text_y);
+      p.Text(TR("< 上一页"), 20, pager_text_y);
     }
     char page_buf[32];
     std::snprintf(page_buf, sizeof(page_buf), "%d / %d", page_index_ + 1,
@@ -221,15 +223,15 @@ void BookshelfPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
     if (end_idx < total_books) {
       next_page_rect_ = Rect{screen_w * 2 / 3, pager_top, screen_w / 3,
                              pager_h};
-      const std::string next_str = "下一页 >";
+      const std::string next_str = TR("下一页 >");
       p.Text(next_str, screen_w - 20 - p.Width(next_str), pager_text_y);
     }
   }
 
-  ctx.DrawBottomBar({"传书", "设置", "休眠"});
+  ctx.DrawBottomBar({TR("传书"), TR("设置"), TR("休眠")});
 
   if (!has_card) {
-    DrawMessageBox(p, {"未检测到TF卡"});
+    DrawMessageBox(p, {TR("未检测到TF卡")});
   } else if (confirm_dialog_.is_open()) {
     confirm_dialog_.Draw(p);
   } else if (sort_menu_.is_open()) {
@@ -238,7 +240,7 @@ void BookshelfPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
     action_menu_.Draw(p);
   } else if (fallback_font) {
     DrawMessageBox(
-        p, {"字体文件缺失，正在使用内置字体", "请通过“传书”上传字体文件"});
+        p, {TR("字体文件缺失，正在使用内置字体"), TR("请通过“传书”上传字体文件")});
   }
 }
 
@@ -249,16 +251,16 @@ void BookshelfPage::openDeleteConfirm(app::AppContext& ctx) {
       ctx.canvas().width() - 80 - 2 * static_cast<int>(fs * 0.8);
   const std::string& label =
       selected_title_.empty() ? selected_book_ : selected_title_;
-  const std::string prefix = "确定删除《";
-  const std::string suffix = "》？";
+  const std::string prefix = TR("确定删除《");
+  const std::string suffix = TR("》？");
   p.Prepare(prefix + suffix + "..." + label);
   const int avail =
       std::max(fs * 2, max_line_w - p.Width(prefix) - p.Width(suffix));
   const std::string short_name = Ellipsize(p.cache(), label, avail);
-  confirm_dialog_.Open("删除书籍",
+  confirm_dialog_.Open(TR("删除书籍"),
                        {prefix + short_name + suffix,
-                        "书籍文件和阅读记录都会删除，", "此操作不可恢复。"},
-                       "删除");
+                        TR("书籍文件和阅读记录都会删除，"), TR("此操作不可恢复。")},
+                       TR("删除"));
   ctx.DrawCurrentPage();
 }
 
@@ -270,7 +272,7 @@ void BookshelfPage::clearSelectedBookRecord(app::AppContext& ctx) {
     clampPageIndex(ctx);
     ctx.DrawCurrentPage();
   } else if (!hal::SdErrorPending()) {
-    ctx.ShowPrompt("操作失败");
+    ctx.ShowPrompt(TR("操作失败"));
     delay(1000);
     ctx.DrawCurrentPage();
   }
@@ -286,7 +288,7 @@ void BookshelfPage::deleteSelectedBook(app::AppContext& ctx) {
     clampPageIndex(ctx);
     ctx.DrawCurrentPage();
   } else if (!hal::SdErrorPending()) {
-    ctx.ShowPrompt("删除失败");
+    ctx.ShowPrompt(TR("删除失败"));
     delay(1000);
     bookshelf_.refresh(ctx.settings.bookshelf_sort);
     clampPageIndex(ctx);
@@ -377,7 +379,7 @@ app::Nav BookshelfPage::handleEvent(const app::Event& msg,
         if (book_idx < books.size()) {
           selected_book_ = books[book_idx].filename;
           selected_title_ = books[book_idx].title;
-          action_menu_.Open(selected_title_, {"清除阅读记录", "删除书籍"});
+          action_menu_.Open(selected_title_, {TR("清除阅读记录"), TR("删除书籍")});
           ctx.DrawCurrentPage();
         }
         break;
@@ -422,7 +424,7 @@ app::Nav BookshelfPage::handleEvent(const app::Event& msg,
   if (footer_col == 2) return app::Nav::Push(State::SLEEP);
 
   if (ctx.storage.card_present() && sort_rect_.Contains(x, y)) {
-    sort_menu_.Open("排序方式", {"最近阅读", "书名", "阅读进度", "最近导入"},
+    sort_menu_.Open(TR("排序方式"), {TR("最近阅读"), TR("书名"), TR("阅读进度"), TR("最近导入")},
                     static_cast<int>(ctx.settings.bookshelf_sort));
     ctx.DrawCurrentPage();
     return app::Nav::Stay();
@@ -447,7 +449,7 @@ app::Nav BookshelfPage::handleEvent(const app::Event& msg,
           return app::Nav::Root(State::READER);
         }
         if (!hal::SdErrorPending()) {
-          ctx.ShowPrompt("无法打开该书籍");
+          ctx.ShowPrompt(TR("无法打开该书籍"));
           delay(1200);
           bookshelf_.refresh(ctx.settings.bookshelf_sort);
           ctx.DrawCurrentPage();

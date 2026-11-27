@@ -11,6 +11,8 @@
 #include <cstdint>
 #include <string>
 
+#include "i18n/i18n.h"
+
 namespace reader {
 namespace core {
 
@@ -133,6 +135,7 @@ struct Settings {
   bool lock_screen_enabled = false;
   std::string lock_screen_path;
   SleepMode sleep_mode = SleepMode::kDeep;
+  i18n::Language language = i18n::Language::kZhHans;
   BookshelfSort bookshelf_sort = BookshelfSort::kRecentRead;
   // Monotonic sequence incremented each time a book is opened (`last_read=` in
   // per-book `.cfg`), avoiding reliance on an uncalibrated hardware RTC.
