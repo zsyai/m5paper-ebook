@@ -1,6 +1,7 @@
 #include "book/book_reader.h"
 #include "hal/storage.h"
 #include "book/page_layout.h"
+#include "book/utf8_utils.h"
 #include "core/perf_trace.h"
 #include <M5Unified.h>
 #include <algorithm>
@@ -281,12 +282,43 @@ void BookReader::paginate(PageFontCache& cache, int screen_w, int screen_h) {
         reader::book::ToUtf8(buffer, end, current_encoding);
     const size_t used = reader::book::MeasurePage(
         reinterpret_cast<const uint8_t*>(utf8.data()), utf8.size(), layout,
-        cache, &cursor, &page_filled, &page);
+        cache, &cursor, &page_filled, &page,
+        /*more_follows=*/offset + static_cast<uint32_t>(read_bytes) < limit);
     offset += reader::book::RawBytesForUtf8Prefix(buffer, end,
                                                   current_encoding, used);
     // About one more page of text, so the next page turn finds most of
     // its glyphs cached. Bounded so large fonts stay within the cache.
     prefetch = utf8.substr(used, used);
+  }
+
+  // The page index may end this page inside a hyphenated word; the layout
+  // above stopped at `limit` and could not see the rest of the word.
+  if (!page.empty() && offset == limit && limit < file_size_ &&
+      page.back() != '\n' && page.back() != '-' && file.seek(limit)) {
+    const int n = file.read(buffer, 8);
+    if (n > 0) {
+      const size_t safe = reader::book::SafeChunkEnd(buffer, n, current_encoding);
+      const std::string next =
+          reader::book::ToUtf8(buffer, safe, current_encoding);
+      auto is_letter = [](uint32_t u) {
+        return (u >= 'A' && u <= 'Z') || (u >= 'a' && u <= 'z') ||
+               (u >= 0xC0 && u <= 0x24F && u != 0xD7 && u != 0xF7);
+      };
+      int b1 = 0;
+      int b2 = 0;
+      const auto* np = reinterpret_cast<const uint8_t*>(next.data());
+      const uint32_t after = next.empty() ? 0
+          : Utf8Utils::getNextCharUnicode(np, np + next.size(), b1);
+      // Last character of the page.
+      size_t k = page.size() - 1;
+      while (k > 0 && (static_cast<uint8_t>(page[k]) & 0xC0) == 0x80) --k;
+      const auto* pp = reinterpret_cast<const uint8_t*>(page.data()) + k;
+      const uint32_t before = Utf8Utils::getNextCharUnicode(
+          pp, reinterpret_cast<const uint8_t*>(page.data()) + page.size(), b2);
+      if (b1 > 0 && b2 > 0 && is_letter(before) && is_letter(after)) {
+        page.push_back('-');
+      }
+    }
   }
   free(buffer);
 
