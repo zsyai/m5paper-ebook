@@ -2,8 +2,8 @@
 #define EXPERIMENTAL_USERS_ZHENGSHUYU_READER_INCLUDE_UI_PAGES_SYSTEM_SETTINGS_PAGE_H_
 
 // 系统设置, opened from the bookshelf: 阅读设置 entry, UI font, sleep mode,
-// lock-screen wallpaper, cleaning old reading records and unused font caches,
-// and the user guide.
+// interface language, lock-screen wallpaper, cleaning old reading records and
+// unused font caches, and the user guide.
 
 #include <string>
 #include <vector>
@@ -39,6 +39,7 @@ class SystemSettingsPage : public Page {
   Rect reading_row_;
   SelectorRow ui_font_row_;
   SelectorRow sleep_row_;
+  SelectorRow language_row_;
   Rect lock_toggle_;
   Rect wallpaper_button_;
   Rect clean_button_;

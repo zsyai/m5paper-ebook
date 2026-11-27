@@ -8,6 +8,7 @@
 
 #include "app/app_context.h"
 #include "core/perf_trace.h"
+#include "i18n/i18n.h"
 #include "ui/widgets/bars.h"
 
 namespace reader {
@@ -47,7 +48,7 @@ Rect DrawResetButton(UiPainter& p, int top) {
   const int w = fs * 5;
   const int h = static_cast<int>(fs * 1.8f);
   const Rect r{(p.canvas().width() - w) / 2, top, w, h};
-  DrawButton(p, r, "恢复默认");
+  DrawButton(p, r, TR("恢复默认"));
   return r;
 }
 
@@ -70,19 +71,19 @@ void DashedH(LGFX_Sprite& c, int x0, int x1, int y) {
 const char* TouchActionLabel(core::TouchAction action) {
   switch (action) {
     case core::TouchAction::kPrevPage:
-      return "上一页";
+      return TR("上一页");
     case core::TouchAction::kNextPage:
-      return "下一页";
+      return TR("下一页");
     case core::TouchAction::kMenu:
-      return "菜单";
+      return TR("菜单");
     case core::TouchAction::kFullRefresh:
-      return "全刷";
+      return TR("全刷");
     case core::TouchAction::kToggleAutoTurn:
-      return "自动翻页";
+      return TR("自动翻页");
     case core::TouchAction::kNone:
       break;
   }
-  return "无";
+  return TR("无");
 }
 
 core::TouchAction CycleTouchAction(core::TouchAction action, int direction) {
@@ -106,7 +107,7 @@ void ControlsSettingsPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   const int fs = p.font_size();
   const int screen_w = canvas.width();
   const int row_h = RowHeight(ctx);
-  ctx.DrawHeader("操作设置");
+  ctx.DrawHeader(TR("操作设置"));
 
   int top = ctx.header_height() - 4;
   auto next_row = [&]() {
@@ -116,13 +117,13 @@ void ControlsSettingsPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   };
 
   const Rect refresh_row = next_row();
-  DrawRowLabel(p, refresh_row, "全刷间隔");
+  DrawRowLabel(p, refresh_row, TR("全刷间隔"));
   refresh_stepper_.Draw(p, refresh_row,
-                        std::to_string(s.full_refresh_pages) + " 页");
+                        std::to_string(s.full_refresh_pages) + TR(" 页"));
 
   const Rect auto_row = next_row();
   DrawRowLabel(p, auto_row, "");
-  const std::string auto_label = "自动翻页";
+  const std::string auto_label = TR("自动翻页");
   p.Prepare(auto_label);
   p.Text(auto_label, kRowPaddingX, p.CenterY(auto_row.y, auto_row.h));
   const int toggle_h = static_cast<int>(fs * 1.8f);
@@ -131,19 +132,21 @@ void ControlsSettingsPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
                     static_cast<int>(fs * 2.2f), toggle_h};
   DrawToggle(p, toggle, s.auto_turn);
   auto_toggle_ = Rect{0, auto_row.y, toggle.x + toggle.w, auto_row.h};
-  auto_stepper_.Draw(p, auto_row, std::to_string(s.auto_turn_seconds) + "秒");
+  auto_stepper_.Draw(p, auto_row,
+                     std::to_string(s.auto_turn_seconds) + TR("秒"));
 
   tap_row_ = next_row();
-  DrawNavRow(p, tap_row_, "点击区域",
-             s.tap_layout == core::TapLayout::kGrid ? "九宫格" : "三栏");
+  DrawNavRow(p, tap_row_, TR("点击区域"),
+             s.tap_layout == core::TapLayout::kGrid ? TR("九宫格") : TR("三栏"));
   swipe_row_ = next_row();
-  DrawNavRow(p, swipe_row_, "滑动操作", "");
-  wheel_row_.Draw(p, next_row(), "滚轮方向", s.wheel_inverted ? "反转" : "正常",
+  DrawNavRow(p, swipe_row_, TR("滑动操作"), "");
+  wheel_row_.Draw(p, next_row(), TR("滚轮方向"),
+                  s.wheel_inverted ? TR("反转") : TR("正常"),
                   /*has_arrows=*/true);
   bluetooth_row_ = next_row();
-  DrawNavRow(p, bluetooth_row_, "蓝牙翻页器", "未连接");
+  DrawNavRow(p, bluetooth_row_, TR("蓝牙翻页器"), TR("未连接"));
 
-  ctx.DrawBottomBar({"返回", "排版设置"});
+  ctx.DrawBottomBar({TR("返回"), TR("排版设置")});
   keypad_.Draw(p);
 }
 
@@ -184,12 +187,12 @@ void ControlsSettingsPage::openKeypad(app::AppContext& ctx, Field field) {
   editing_ = field;
   switch (field) {
     case Field::kFullRefreshPages:
-      keypad_.Open(RangeTitle("全刷间隔", core::kMinFullRefreshPages,
+      keypad_.Open(RangeTitle(TR("全刷间隔"), core::kMinFullRefreshPages,
                               core::kMaxFullRefreshPages),
                    kMaxRefreshDigits);
       break;
     case Field::kAutoTurnSeconds:
-      keypad_.Open(RangeTitle("自动翻页秒数", core::kMinAutoTurnSeconds,
+      keypad_.Open(RangeTitle(TR("自动翻页秒数"), core::kMinAutoTurnSeconds,
                               core::kMaxAutoTurnSeconds),
                    kMaxSecondsDigits);
       break;
@@ -286,7 +289,7 @@ app::Nav ControlsSettingsPage::handleEvent(const app::Event& msg,
     s.wheel_inverted = !s.wheel_inverted;
     commit(ctx);
   } else if (bluetooth_row_.Contains(x, y)) {
-    ctx.ShowPrompt("蓝牙翻页器暂未支持");
+    ctx.ShowPrompt(TR("蓝牙翻页器暂未支持"));
     delay(1200);
     ctx.DrawCurrentPage();
   }
@@ -302,17 +305,17 @@ void TapZonesPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   const int fs = p.font_size();
   const int screen_w = canvas.width();
   const int footer_top = canvas.height() - ctx.footer_height();
-  ctx.DrawHeader("点击区域");
+  ctx.DrawHeader(TR("点击区域"));
 
   int top = ctx.header_height() - 4;
   const int row_h = RowHeight(ctx);
   const int seg_h = static_cast<int>(fs * 1.8f);
   layout_area_ = Rect{kRowPaddingX, top + (row_h - seg_h) / 2,
                       screen_w - 2 * kRowPaddingX, seg_h};
-  layout_.Draw(p, layout_area_, {"三栏", "九宫格"},
+  layout_.Draw(p, layout_area_, {TR("三栏"), TR("九宫格")},
                static_cast<int>(s.tap_layout));
   top += row_h;
-  p.TextIn("点区域切换功能", Rect{0, top, screen_w, fs * 2});
+  p.TextIn(TR("点区域切换功能"), Rect{0, top, screen_w, fs * 2});
   top += fs * 2;
 
   const int button_h = static_cast<int>(fs * 1.8f);
@@ -347,7 +350,7 @@ void TapZonesPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   }
 
   reset_ = DrawResetButton(p, footer_top - button_h - fs);
-  ctx.DrawBottomBar({"返回"});
+  ctx.DrawBottomBar({TR("返回")});
 }
 
 Rect TapZonesPage::zoneRect(core::TapLayout tap_layout, int row,
@@ -429,16 +432,16 @@ void SwipeSettingsPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   canvas.fillScreen(TFT_WHITE);
   const int fs = p.font_size();
   const int row_h = RowHeight(ctx);
-  ctx.DrawHeader("滑动操作");
+  ctx.DrawHeader(TR("滑动操作"));
   int top = ctx.header_height() - 4;
   for (int i = 0; i < 4; ++i) {
     row_rects_[i] = Rect{0, top, canvas.width(), row_h};
-    rows_[i].Draw(p, row_rects_[i], kSwipeLabels[i],
+    rows_[i].Draw(p, row_rects_[i], TR(kSwipeLabels[i]),
                   TouchActionLabel(*SwipeField(s, i)), /*has_arrows=*/true);
     top += row_h;
   }
   reset_ = DrawResetButton(p, top + fs);
-  ctx.DrawBottomBar({"返回"});
+  ctx.DrawBottomBar({TR("返回")});
 }
 
 app::Nav SwipeSettingsPage::handleEvent(const app::Event& msg,

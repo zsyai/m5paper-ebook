@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "i18n/i18n.h"
 #include "ui/text_renderer.h"
 #include "ui/widgets/controls.h"
 
@@ -121,7 +122,7 @@ void ActionMenu::Draw(UiPainter& p) {
                     TFT_BLACK);
   }
 
-  p.Prepare(title_ + "...取消");
+  p.Prepare(title_ + TR("...取消"));
   const std::string short_title =
       Ellipsize(p.cache(), title_, box_.w - 2 * pad);
   p.TextIn(short_title, Rect{box_.x + pad, box_.y, box_.w - 2 * pad, header_h});
@@ -153,7 +154,7 @@ void ActionMenu::Draw(UiPainter& p) {
   top += pad;
   const int button_w = (box_.w - 3 * pad) / 2;
   cancel_ = Rect{box_.center_x() - button_w / 2, top, button_w, button_h};
-  DrawButton(p, cancel_, "取消");
+  DrawButton(p, cancel_, TR("取消"));
 }
 
 int ActionMenu::Press(int x, int y) const {

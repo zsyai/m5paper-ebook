@@ -13,6 +13,7 @@
 #include "core/perf_trace.h"
 #include "core/settings.h"
 #include "fonts/font_manager.h"
+#include "i18n/i18n.h"
 #include "ui/widgets/bars.h"
 
 namespace reader {
@@ -73,7 +74,7 @@ void LayoutSettingsPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   const int fs = p.font_size();
   const int screen_w = canvas.width();
   const int row_h = static_cast<int>(fs * 2.5f);
-  ctx.DrawHeader("排版设置");
+  ctx.DrawHeader(TR("排版设置"));
 
   int top = ctx.header_height() - 4;
   auto next_row = [&]() {
@@ -82,20 +83,20 @@ void LayoutSettingsPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
     return row;
   };
 
-  font_row_.Draw(p, next_row(), "正文字体",
+  font_row_.Draw(p, next_row(), TR("正文字体"),
                  FontManager::displayName(s.body_font_path),
                  font_options_.size() > 1);
 
   const Rect size_row = next_row();
-  DrawRowLabel(p, size_row, "正文字号");
+  DrawRowLabel(p, size_row, TR("正文字号"));
   if (ctx.fonts.IsBodyFontScalable(s)) {
     size_stepper_.Draw(p, size_row, std::to_string(s.body_font_size));
   } else {
-    size_stepper_.Draw(p, size_row, "固定", /*enabled=*/false);
+    size_stepper_.Draw(p, size_row, TR("固定"), /*enabled=*/false);
   }
 
-  p.Prepare("阅读方向");
-  const int seg_x = kRowPaddingX + p.Width("阅读方向") + fs * 2 / 3;
+  p.Prepare(TR("阅读方向"));
+  const int seg_x = kRowPaddingX + p.Width(TR("阅读方向")) + fs * 2 / 3;
   const int seg_h = static_cast<int>(fs * 1.8f);
   auto segment_area = [&](const Rect& row) {
     return Rect{seg_x, row.center_y() - seg_h / 2,
@@ -103,23 +104,23 @@ void LayoutSettingsPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   };
 
   const Rect spacing_row = next_row();
-  DrawRowLabel(p, spacing_row, "行间距");
+  DrawRowLabel(p, spacing_row, TR("行间距"));
   spacing_stepper_.Draw(p, spacing_row, FormatSpacing(s.line_spacing));
 
   const Rect margin_row = next_row();
-  DrawRowLabel(p, margin_row, "页边距");
+  DrawRowLabel(p, margin_row, TR("页边距"));
   margin_stepper_.Draw(p, margin_row, std::to_string(s.margin));
 
   const Rect toggle_row = next_row();
   DrawRowLabel(p, toggle_row, "");
-  indent_hit_ = DrawToggleItem(p, toggle_row, kRowPaddingX, "段首缩进",
+  indent_hit_ = DrawToggleItem(p, toggle_row, kRowPaddingX, TR("段首缩进"),
                                s.paragraph_indent);
   underline_hit_ =
-      DrawToggleItem(p, toggle_row, screen_w / 2 + kRowPaddingX / 2, "行下虚线",
+      DrawToggleItem(p, toggle_row, screen_w / 2 + kRowPaddingX / 2, TR("行下虚线"),
                      s.line_underline);
 
   const Rect orientation_row = next_row();
-  DrawRowLabel(p, orientation_row, "阅读方向");
+  DrawRowLabel(p, orientation_row, TR("阅读方向"));
   orientation_.Draw(p, segment_area(orientation_row), kOrientationLabels,
                     static_cast<int>(s.orientation));
 
@@ -130,7 +131,7 @@ void LayoutSettingsPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   canvas.drawRect(preview.x, preview.y, preview.w, preview.h, TFT_BLACK);
   ctx.book.DrawBodyPreview(preview.Inset(std::max(s.margin, 2)));
 
-  ctx.DrawBottomBar({"返回", "操作设置"});
+  ctx.DrawBottomBar({TR("返回"), TR("操作设置")});
   keypad_.Draw(p);
 }
 
@@ -151,7 +152,7 @@ void LayoutSettingsPage::commit(app::AppContext& ctx) {
 void LayoutSettingsPage::stepBodyFont(app::AppContext& ctx, int delta) {
   const int count = static_cast<int>(font_options_.size());
   if (count <= 1) return;
-  ctx.ShowPrompt("加载中...");
+  ctx.ShowPrompt(TR("加载中..."));
   font_index_ = (font_index_ + delta + count) % count;
   ctx.SetBodyFontPath(font_options_[font_index_]);
   commit(ctx);
@@ -187,15 +188,15 @@ void LayoutSettingsPage::openKeypad(app::AppContext& ctx, Field field) {
   editing_ = field;
   switch (field) {
     case Field::kBodyFontSize:
-      keypad_.Open(RangeTitle("正文字号", core::kMinBodyFontSize,
+      keypad_.Open(RangeTitle(TR("正文字号"), core::kMinBodyFontSize,
                               core::kMaxBodyFontSize),
                    kMaxFieldDigits);
       break;
     case Field::kLineSpacing:
-      keypad_.OpenDecimal("行间距 1.0-3.0", kMaxSpacingChars);
+      keypad_.OpenDecimal(TR("行间距 1.0-3.0"), kMaxSpacingChars);
       break;
     case Field::kMargin:
-      keypad_.Open(RangeTitle("页边距", core::kMinMargin, core::kMaxMargin),
+      keypad_.Open(RangeTitle(TR("页边距"), core::kMinMargin, core::kMaxMargin),
                    kMaxFieldDigits);
       break;
     case Field::kNone:

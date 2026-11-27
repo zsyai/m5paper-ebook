@@ -9,6 +9,7 @@
 
 #include "book/gbk_unicode_table.h"
 #include "book/utf8_utils.h"
+#include "i18n/i18n.h"
 
 namespace reader {
 namespace book {
@@ -59,15 +60,15 @@ bool HasBookBeenOpened(const BookInfo& book) {
 const char* BookshelfSortName(core::BookshelfSort mode) {
   switch (mode) {
     case core::BookshelfSort::kRecentRead:
-      return "最近阅读";
+      return TR("最近阅读");
     case core::BookshelfSort::kTitle:
-      return "书名";
+      return TR("书名");
     case core::BookshelfSort::kReadingProgress:
-      return "阅读进度";
+      return TR("阅读进度");
     case core::BookshelfSort::kRecentImport:
-      return "最近导入";
+      return TR("最近导入");
   }
-  return "最近阅读";
+  return TR("最近阅读");
 }
 
 std::string BuildTitleSortKey(const std::string& title) {

@@ -11,6 +11,7 @@
 #include "book/book_toc.h"
 #include "core/perf_trace.h"
 #include "hal/input.h"
+#include "i18n/i18n.h"
 #include "ui/text_renderer.h"
 #include "ui/widgets/bars.h"
 
@@ -73,22 +74,22 @@ void TocPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   const int end_idx = std::min(total_entries, start_idx + per_page);
   const int active_idx = ctx.book.ActiveTocIndex();
 
-  std::string preload = "目录暂无目录上一页下一页返回跳转…/0123456789.";
+  std::string preload = i18n::GlyphPreload("目录暂无目录上一页下一页返回跳转…/0123456789.");
   for (int i = start_idx; i < end_idx; ++i) {
     preload += entries[static_cast<size_t>(i)].title;
   }
   p.Prepare(preload);
 
   canvas.fillScreen(TFT_WHITE);
-  ctx.DrawHeader("目录");
+  ctx.DrawHeader(TR("目录"));
 
   row_rects_.clear();
   prev_page_rect_ = Rect{};
   next_page_rect_ = Rect{};
 
   if (entries.empty()) {
-    p.TextIn("暂无目录", Rect{0, header_h, screen_w, pager_top - header_h});
-    ctx.DrawBottomBar({"返回", "跳转"});
+    p.TextIn(TR("暂无目录"), Rect{0, header_h, screen_w, pager_top - header_h});
+    ctx.DrawBottomBar({TR("返回"), TR("跳转")});
     return;
   }
 
@@ -125,7 +126,7 @@ void TocPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
     const int pager_text_y = p.CenterY(pager_top, pager_h);
     if (page_index_ > 0) {
       prev_page_rect_ = Rect{0, pager_top, screen_w / 3, pager_h};
-      p.Text("上一页", screen_w / 6 - p.Width("上一页") / 2, pager_text_y);
+      p.Text(TR("上一页"), screen_w / 6 - p.Width(TR("上一页")) / 2, pager_text_y);
     }
     char counter[32];
     std::snprintf(counter, sizeof(counter), "%d/%d", page_index_ + 1,
@@ -134,11 +135,12 @@ void TocPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
     if (page_index_ + 1 < total_pages) {
       next_page_rect_ = Rect{screen_w * 2 / 3, pager_top, screen_w / 3,
                              pager_h};
-      p.Text("下一页", screen_w * 5 / 6 - p.Width("下一页") / 2, pager_text_y);
+      p.Text(TR("下一页"), screen_w * 5 / 6 - p.Width(TR("下一页")) / 2,
+             pager_text_y);
     }
   }
 
-  ctx.DrawBottomBar({"返回", "跳转"});
+  ctx.DrawBottomBar({TR("返回"), TR("跳转")});
 }
 
 app::Nav TocPage::handleEvent(const app::Event& msg, app::AppContext& ctx) {

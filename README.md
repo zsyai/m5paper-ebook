@@ -23,7 +23,7 @@
         并在后台自动识别章节标题生成目录。
     *   EPUB 支持 EPUB 2 / 3：书架显示书名，读取书内目录，封面与插图以独立插图页显示（支持渐进式 JPEG）。首次打开先显示开头章节，
         其余章节在后台逐步转换。
-    *   针对中文排版与行首禁则标点的换行处理。
+    *   针对中文排版与行首禁则标点的换行处理；西文按单词换行，过长的单词按音节加连字符断开。
 *   **章节目录与精准跳转**：
     *   阅读菜单中打开「目录」即可跳转到任意章节。
     *   支持按页码或百分比数字键盘跳转，顶部实时显示当前页码、总页数与进度。
@@ -53,6 +53,7 @@
 *   **Wi-Fi 无线传书 (Web UI)**：
     *   在书架页开启局域网热点，使用手机或电脑浏览器批量上传 `.txt` / `.epub` 电子书、`.ttf` / `.otf` / `.bin`
         字体文件及锁屏图片；遇到同名文件会先询问是否覆盖。
+*   **界面语言**：简体中文（默认）或 Français（法语），在「系统设置 > 语言」中切换，传书网页与使用说明同步切换。
 *   **电源与存储管理**：
     *   **深度休眠**（默认，最省电）或 **浅休眠**（拨动滚轮即可唤醒），唤醒后回到休眠前的页面或阅读位置。
     *   选择 SD 卡中的图片作为锁屏壁纸，支持半透明 PNG 叠加在休眠前的画面上。
@@ -208,7 +209,8 @@ interface for transferring books, fonts, and images over Wi-Fi.
         (progressive JPEG supported). A new EPUB opens on its first chapters
         right away while the rest is converted in the background.
     *   Word wrapping and line-start punctuation rules (kinsoku) for Chinese
-        typography.
+        typography; Latin text breaks between words, and a word too long for
+        the line is hyphenated at a syllable boundary.
 *   **Chapter Navigation & Jump**:
     *   Open **TOC** from the reading menu to jump to any chapter.
     *   Jump by page number or percentage via a numeric keypad displaying
@@ -255,6 +257,9 @@ interface for transferring books, fonts, and images over Wi-Fi.
     *   Runs a local Web Server on M5Paper to batch-upload `.txt` / `.epub`
         books, `.ttf` / `.otf` / `.bin` fonts, and lock-screen images from your
         phone or computer; asks before overwriting a file with the same name.
+*   **Interface language**: Simplified Chinese (default) or French, switched
+    in System Settings > Language; the transfer web page and the user guide
+    follow it. See `include/i18n/i18n.h` to add a language.
 *   **Power & Storage Management**:
     *   **Deep sleep** (default, lowest power) or **light sleep** (wake by
         rolling the wheel); the device returns to the page or reading position

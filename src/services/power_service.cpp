@@ -12,6 +12,7 @@
 #include "core/diag_log.h"
 #include "hal/battery.h"
 #include "hal/input.h"
+#include "i18n/i18n.h"
 #include "ui/pages/image_picker_page.h"
 
 namespace reader {
@@ -79,9 +80,9 @@ bool PowerService::DrawSleepScreen(core::Settings* settings, bool light,
   if (!drawn) {
     canvas.fillScreen(TFT_WHITE);
     ui::UiPainter& p = frame_.painter();
-    const std::string prompt1 = "系统已进入休眠";
+    const std::string prompt1 = TR("系统已进入休眠");
     const std::string prompt2 =
-        light ? "按下或拨动滚轮即可唤醒" : "向内长按滚轮键2秒即可唤醒";
+        light ? TR("按下或拨动滚轮即可唤醒") : TR("向内长按滚轮键2秒即可唤醒");
     p.Prepare(prompt1 + prompt2);
     const int font_size = fonts_.ui_font_size();
     const int screen_w = canvas.width();

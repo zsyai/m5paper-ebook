@@ -9,7 +9,7 @@
 #include "app/app_context.h"
 #include "book/page_layout.h"
 #include "hal/input.h"
-#include "ui/pages/user_guide_text.h"
+#include "i18n/i18n.h"
 #include "ui/widgets/bars.h"
 
 namespace reader {
@@ -23,7 +23,8 @@ void UserGuidePage::paginate(app::AppContext& ctx, LGFX_Sprite& canvas) {
 
   UiPainter& p = ctx.painter();
   layout_font_path_ = p.font_path();
-  const std::string text = USER_GUIDE_TEXT;
+  layout_language_ = i18n::CurrentLanguage();
+  const std::string text = i18n::UserGuideText();
   p.Prepare(text);
 
   book::LayoutParams layout;
@@ -52,11 +53,12 @@ void UserGuidePage::paginate(app::AppContext& ctx, LGFX_Sprite& canvas) {
 
 void UserGuidePage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   UiPainter& p = ctx.painter();
-  if (pages_.empty() || layout_font_path_ != p.font_path()) {
+  if (pages_.empty() || layout_font_path_ != p.font_path() ||
+      layout_language_ != i18n::CurrentLanguage()) {
     paginate(ctx, canvas);
   }
 
-  std::string preload = "返回使用说明0123456789/· ";
+  std::string preload = i18n::GlyphPreload("返回使用说明0123456789/· ");
   if (current_page_idx_ >= 0 &&
       current_page_idx_ < static_cast<int>(pages_.size())) {
     preload += pages_[current_page_idx_];
@@ -72,7 +74,7 @@ void UserGuidePage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   }
 
   char prog_str[64];
-  std::snprintf(prog_str, sizeof(prog_str), "使用说明 · %d/%d",
+  std::snprintf(prog_str, sizeof(prog_str), TR("使用说明 · %d/%d"),
                 current_page_idx_ + 1, static_cast<int>(pages_.size()));
   ctx.DrawBottomBar({prog_str});
 }

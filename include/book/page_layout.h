@@ -53,11 +53,17 @@ bool ParseImagePageMarker(const std::string& text, uint32_t* zip_entry_index);
 // sets `*page_filled` once the page is full.
 //
 // If `out` is set, the text to draw is appended to it: the laid-out
-// characters without '\r', with '\n' at every line break and the indent
-// (two U+3000) at paragraph starts.
+// characters without '\r', with '\n' at every line break ("-\n" where a
+// word is hyphenated) and the indent (two U+3000) at paragraph starts.
+//
+// Lines break between words; a word that does not fit is hyphenated at a
+// French syllable boundary when possible. Set `more_follows` when `text` is
+// a chunk and more text follows: a word cut by the chunk end is then left for
+// the next call (the return value stops at its start).
 size_t MeasurePage(const uint8_t* text, size_t len, const LayoutParams& layout,
                    const PageFontCache& cache, LayoutCursor* cursor,
-                   bool* page_filled, std::string* out = nullptr);
+                   bool* page_filled, std::string* out = nullptr,
+                   bool more_follows = false);
 
 struct LineSpan {
   // Byte offset in `text` where starting MeasurePage reproduces this line and

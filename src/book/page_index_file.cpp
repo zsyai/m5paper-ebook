@@ -14,7 +14,7 @@ namespace {
 
 constexpr char kMagic[4] = {'R', 'I', 'D', 'X'};
 // v3 adds margin, paragraph indent and orientation; older files are rebuilt.
-constexpr uint16_t kVersion = 3;
+constexpr uint16_t kVersion = 4;  // 4: word wrap + hyphenation
 
 // Header layout (little-endian, as written by the ESP32):
 //   char[4] magic, u16 version, u16 reserved,

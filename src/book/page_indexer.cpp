@@ -435,14 +435,15 @@ void PageIndexer::StepForwardOnePage(const PageFontCache& cache) {
       offset += static_cast<uint32_t>(n);
       continue;
     }
+    const bool more = offset + static_cast<uint32_t>(n) < file_size_;
     if (encoding_ == TextEncoding::UTF8) {
-      offset += static_cast<uint32_t>(
-          MeasurePage(chunk, end, layout_, cache, &cursor, &page_filled));
+      offset += static_cast<uint32_t>(MeasurePage(
+          chunk, end, layout_, cache, &cursor, &page_filled, nullptr, more));
     } else {
       const std::string utf8 = ToUtf8(chunk, end, encoding_);
       const size_t used = MeasurePage(
           reinterpret_cast<const uint8_t*>(utf8.data()), utf8.size(), layout_,
-          cache, &cursor, &page_filled);
+          cache, &cursor, &page_filled, nullptr, more);
       offset += static_cast<uint32_t>(
           RawBytesForUtf8Prefix(chunk, end, encoding_, used));
     }

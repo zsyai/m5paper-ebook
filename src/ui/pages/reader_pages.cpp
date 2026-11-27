@@ -7,6 +7,7 @@
 
 #include "app/app_context.h"
 #include "hal/input.h"
+#include "i18n/i18n.h"
 #include "ui/text_renderer.h"
 #include "ui/widgets/controls.h"
 
@@ -67,9 +68,9 @@ app::Nav ReaderPage::runAction(app::AppContext& ctx, core::TouchAction action) {
       ctx.SaveSettings();
       restartAutoTurn();
       ctx.ShowPrompt(s.auto_turn
-                         ? "自动翻页：开（" +
-                               std::to_string(s.auto_turn_seconds) + "秒）"
-                         : std::string("自动翻页：关"));
+                         ? TR("自动翻页：开（") +
+                               std::to_string(s.auto_turn_seconds) + TR("秒）")
+                         : std::string(TR("自动翻页：关")));
       delay(kAutoTurnPromptMs);
       ctx.book.DrawReadingView(ctx.settings);
       break;
@@ -147,7 +148,7 @@ void ReaderMenuPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   top_bar_ = Rect{0, 0, screen_w, row_h * 2};
   canvas.fillRect(top_bar_.x, top_bar_.y, top_bar_.w, top_bar_.h, TFT_WHITE);
   back_ = Rect{0, 0, half_w, row_h};
-  p.TextIn("返回", back_);
+  p.TextIn(TR("返回"), back_);
   canvas.drawFastVLine(half_w, 0, row_h, TFT_BLACK);
   ctx.DrawBattery(screen_w - 20, p.CenterY(0, row_h));
   canvas.drawFastHLine(0, row_h, screen_w, TFT_BLACK);
@@ -170,7 +171,7 @@ void ReaderMenuPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
     toc_ = settings_ = sleep_ = Rect{};
     return;
   }
-  p.Prepare("目录阅读设置休眠");
+  p.Prepare(i18n::GlyphPreload("目录阅读设置休眠"));
   DrawArrow(canvas, screen_w - 20 - fs / 2, progress_.center_y(),
             static_cast<int>(fs * 0.4f), /*right=*/true);
   canvas.drawFastHLine(0, progress_.bottom(), screen_w, TFT_BLACK);
@@ -179,9 +180,9 @@ void ReaderMenuPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   toc_ = Rect{0, progress_.bottom(), col1, button_h};
   settings_ = Rect{col1, progress_.bottom(), col2 - col1, button_h};
   sleep_ = Rect{col2, progress_.bottom(), screen_w - col2, button_h};
-  p.TextIn("目录", toc_);
-  p.TextIn("阅读设置", settings_);
-  p.TextIn("休眠", sleep_);
+  p.TextIn(TR("目录"), toc_);
+  p.TextIn(TR("阅读设置"), settings_);
+  p.TextIn(TR("休眠"), sleep_);
   canvas.drawFastVLine(col1, toc_.y, button_h, TFT_BLACK);
   canvas.drawFastVLine(col2, toc_.y, button_h, TFT_BLACK);
 }
@@ -245,12 +246,12 @@ constexpr int kMaxPercentDigits = 3;
 
 void JumpPage::enter(app::AppContext& ctx) {
   g_jump_from_toc = (get_current_state() == State::READER_TOC);
-  keypad_.Open("", kMaxPageDigits, {"按页码", "按百分比"}, kByPage);
+  keypad_.Open("", kMaxPageDigits, {TR("按页码"), TR("按百分比")}, kByPage);
   updateTitle(ctx);
 }
 
 void JumpPage::updateTitle(const app::AppContext& ctx) {
-  keypad_.set_title("跳转 " + ctx.book.ProgressText());
+  keypad_.set_title(TR("跳转 ") + ctx.book.ProgressText());
 }
 
 void JumpPage::draw(app::AppContext& ctx, LGFX_Sprite& /*canvas*/) {

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <utility>
 #include <vector>
@@ -14,6 +15,7 @@
 #include "core/perf_trace.h"
 #include "core/sd_path.h"
 #include "hal/storage.h"
+#include "i18n/i18n.h"
 #include "ui/pages/image_picker_page.h"
 #include "ui/text_renderer.h"
 
@@ -74,7 +76,7 @@ bool BookSession::Open(const std::string& path, core::Settings* settings,
       book_title_ = cached_toc.book_title;
       const std::string shown =
           book_title_.empty() ? display_stem : book_title_;
-      show_open_prompt("正在打开 ", shown);
+      show_open_prompt(TR("正在打开 "), shown);
 
       if (!reader_.open(path, epc_path)) return false;
       reader_.setContentComplete(true);
@@ -85,7 +87,7 @@ bool BookSession::Open(const std::string& path, core::Settings* settings,
       book::ResolveEpubDisplayTitle(path, &fast_title);
       const std::string shown =
           fast_title.empty() ? display_stem : fast_title;
-      show_open_prompt("正在解析 ", shown);
+      show_open_prompt(TR("正在解析 "), shown);
 
       const uint32_t saved_pos = BookReader::peekSavedOffset(path);
       if (!epub_builder_.Start(path, saved_pos)) return false;
@@ -100,7 +102,7 @@ bool BookSession::Open(const std::string& path, core::Settings* settings,
       if (epub_builder_.done()) toc_loaded_ = true;
     }
   } else {
-    show_open_prompt("正在打开 ", display_stem);
+    show_open_prompt(TR("正在打开 "), display_stem);
     if (!reader_.open(path)) return false;
     reader_.setContentComplete(true);
 
@@ -226,7 +228,7 @@ bool BookSession::EnsureEpubSpine(size_t spine_idx) {
 
 bool BookSession::FinishEpubBuildWithPrompt() {
   if (!epub_builder_.active()) return true;
-  frame_.ShowPromptBox("加载中...");
+  frame_.ShowPromptBox(TR("加载中..."));
   const size_t total = epub_builder_.total_spine_count();
   if (total == 0) return false;
   return EnsureEpubSpine(total - 1);
@@ -249,7 +251,7 @@ void BookSession::PrevPage(const core::Settings& settings) {
   PERF_SCOPE("BookSession::PrevPage");
   bool showed_prompt = false;
   if (reader_.needsIndexForPrevPage()) {
-    frame_.ShowPromptBox("加载中...");
+    frame_.ShowPromptBox(TR("加载中..."));
     showed_prompt = true;
     reader_.indexUntilCurrentPage(fonts_.body_cache());
   }
@@ -265,7 +267,7 @@ void BookSession::PrevPage(const core::Settings& settings) {
 bool BookSession::JumpToPage(int page) {
   if (epub_builder_.active() && !FinishEpubBuildWithPrompt()) return false;
   if (!reader_.isIndexComplete() && page >= reader_.getTotalPages()) {
-    frame_.ShowPromptBox("加载中...");
+    frame_.ShowPromptBox(TR("加载中..."));
     reader_.indexUntilPageCount(fonts_.body_cache(), page + 1);
   }
   const book::TextArea area = frame_.ReadingTextArea(reader_.style());
@@ -275,7 +277,7 @@ bool BookSession::JumpToPage(int page) {
 bool BookSession::JumpToPercentage(float percentage) {
   if (epub_builder_.active() && !FinishEpubBuildWithPrompt()) return false;
   if (!reader_.isIndexComplete()) {
-    frame_.ShowPromptBox("加载中...");
+    frame_.ShowPromptBox(TR("加载中..."));
     reader_.finishIndex(fonts_.body_cache());
   }
   const book::TextArea area = frame_.ReadingTextArea(reader_.style());
@@ -299,7 +301,7 @@ void BookSession::EnsureTocReady() {
     }
   }
   if (txt_toc_scanner_.active()) {
-    frame_.ShowPromptBox("加载中...");
+    frame_.ShowPromptBox(TR("加载中..."));
     txt_toc_scanner_.Finish();
     if (!txt_toc_scanner_.read_error()) {
       toc_entries_ = txt_toc_scanner_.entries();
@@ -333,7 +335,7 @@ bool BookSession::JumpToTocEntry(size_t index) {
   }
   if (index >= toc_entries_.size()) return false;
   if (!toc_entries_[index].resolved) {
-    frame_.ShowPromptBox("加载中...");
+    frame_.ShowPromptBox(TR("加载中..."));
     if (!EnsureEpubSpine(toc_entries_[index].spine_index)) return false;
   }
   if (index >= toc_entries_.size() || !toc_entries_[index].resolved) {
@@ -352,8 +354,8 @@ void BookSession::RenderCurrentPage() {
   const std::string text = reader_.getPageText();
   if (text.empty()) {
     ui::UiPainter& p = frame_.painter();
-    p.Prepare("文件为空或读取失败");
-    p.Text("文件为空或读取失败", area.x, area.y);
+    p.Prepare(TR("文件为空或读取失败"));
+    p.Text(TR("文件为空或读取失败"), area.x, area.y);
     return;
   }
 
@@ -373,7 +375,7 @@ void BookSession::RenderCurrentPage() {
     }
     if (!drawn) {
       ui::UiPainter& p = frame_.painter();
-      const std::string msg = "图片解析失败";
+      const std::string msg = TR("图片解析失败");
       p.Prepare(msg);
       p.TextIn(msg, ui::Rect{area.x, area.y, area.w, area.h});
     }
@@ -396,12 +398,7 @@ void BookSession::DrawReadingView(const core::Settings& settings,
 
 void BookSession::DrawBodyPreview(const ui::Rect& box) {
   PERF_SCOPE("BookSession::DrawBodyPreview");
-  static const char kSample[] =
-      "滚滚长江东逝水，浪花淘尽英雄。是非成败转头空。青山依旧在，几度夕阳红。"
-      "白发渔樵江渚上，惯看秋月春风。一壶浊酒喜相逢。古今多少事，都付笑谈中。\n"
-      "话说天下大势，分久必合，合久必分。周末七国分争，并入于秦。及秦灭之后，"
-      "楚、汉分争，又并入于汉。汉朝自高祖斩白蛇而起义，一统天下，后来光武中兴，"
-      "传至献帝，遂分为三国。";
+  const char* const sample = i18n::PreviewSampleText();
   const book::ReadingStyle& style = reader_.style();
   PageFontCache& cache = fonts_.body_cache();
   cache.build(std::string(), style.font_path);
@@ -415,8 +412,8 @@ void BookSession::DrawBodyPreview(const ui::Rect& box) {
   cursor.paragraph_start = true;
   bool filled = false;
   std::string text;
-  book::MeasurePage(reinterpret_cast<const uint8_t*>(kSample),
-                    sizeof(kSample) - 1, layout, cache, &cursor, &filled,
+  book::MeasurePage(reinterpret_cast<const uint8_t*>(sample),
+                    std::strlen(sample), layout, cache, &cursor, &filled,
                     &text);
   cache.build(text, style.font_path);
   frame_.DrawBodyText(cache, style, text, box.x, box.y, box.w, box.h);

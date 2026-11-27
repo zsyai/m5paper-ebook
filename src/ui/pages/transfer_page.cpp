@@ -12,10 +12,14 @@
 
 #include "app/app_context.h"
 #include "core/sd_path.h"
+#include "i18n/i18n.h"
 #include "ui/widgets/bars.h"
 
 extern const char kTransferClientHtml[] asm(
     "_binary_assets_transfer_client_html_start");
+// French page, built by tools/translate_html_fr.py.
+extern const char kTransferClientHtmlFr[] asm(
+    "_binary_assets_transfer_client_fr_html_start");
 
 namespace reader {
 namespace ui {
@@ -62,7 +66,9 @@ void TransferPage::startServer() {
   server_ = new WebServer(80);
 
   server_->on("/", HTTP_GET, [this]() {
-    server_->send(200, "text/html", kTransferClientHtml);
+    const bool fr = i18n::CurrentLanguage() == i18n::Language::kFr;
+    server_->send(200, "text/html",
+                  fr ? kTransferClientHtmlFr : kTransferClientHtml);
   });
 
   server_->on("/api/list", HTTP_GET, [this]() {
@@ -273,16 +279,16 @@ void TransferPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   const int screen_w = canvas.width();
   const int bar_h = ctx.header_height();
 
-  std::string preload =
+  std::string preload = i18n::GlyphPreload(
       "WiFi 传书结束SSID密码IP%0123456789.【】:：/"
-      "无线指南第一步连接热点密码第二步打开浏览器访问第三步在网页中上传文件"
-      "M5PaperAP12345678http";
+      "无线指南第一步连接热点密码第二步打开浏览器访问第三步在网页中上传文件");
+  preload += "M5PaperAP12345678http";
   preload += ip_addr_.c_str();
   p.Prepare(preload);
 
-  ctx.DrawHeader("WiFi 传书");
+  ctx.DrawHeader(TR("WiFi 传书"));
 
-  const std::string title = "【 无线传书指南 】";
+  const std::string title = TR("【 无线传书指南 】");
   const int step_gap = static_cast<int>(fs * 2.3f);
   const int line_gap = static_cast<int>(fs * 1.6f);
 
@@ -290,22 +296,22 @@ void TransferPage::draw(app::AppContext& ctx, LGFX_Sprite& canvas) {
   p.Text(title, screen_w / 2 - p.Width(title) / 2, title_y);
 
   const int step1_y = title_y + step_gap;
-  p.Text("第一步：连接 WiFi 热点", 40, step1_y);
+  p.Text(TR("第一步：连接 WiFi 热点"), 40, step1_y);
   const int ssid_y = step1_y + line_gap;
-  p.Text("      SSID：M5PaperAP", 40, ssid_y);
+  p.Text(TR("      SSID：M5PaperAP"), 40, ssid_y);
   const int pass_y = ssid_y + line_gap;
-  p.Text("      密码：12345678", 40, pass_y);
+  p.Text(TR("      密码：12345678"), 40, pass_y);
 
   const int step2_y = pass_y + step_gap;
-  p.Text("第二步：打开浏览器访问", 40, step2_y);
+  p.Text(TR("第二步：打开浏览器访问"), 40, step2_y);
   const std::string ip_url = "      http://" + std::string(ip_addr_.c_str());
   const int url_y = step2_y + line_gap;
   p.Text(ip_url, 40, url_y);
 
   const int step3_y = url_y + step_gap;
-  p.Text("第三步：在网页中上传文件", 40, step3_y);
+  p.Text(TR("第三步：在网页中上传文件"), 40, step3_y);
 
-  ctx.DrawBottomBar({"结束传书"});
+  ctx.DrawBottomBar({TR("结束传书")});
 }
 
 app::Nav TransferPage::handleEvent(const app::Event& msg,
